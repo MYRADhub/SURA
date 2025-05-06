@@ -1,26 +1,13 @@
 import random
-import time
 from plot import plot_grid
 from agent import send_image_to_model_openai, send_image_to_model_ollama
+from utils import get_valid_actions, move_agent, build_prompt_single
 
 def get_random_positions(grid_size):
     positions = random.sample(range(grid_size * grid_size), 2)
     agent_pos = divmod(positions[0], grid_size)
     goal_pos = divmod(positions[1], grid_size)
     return agent_pos, goal_pos
-
-def move_agent(agent_pos, direction, grid_size=6):
-    row, col = agent_pos
-    if direction == 'up':
-        return (min(grid_size - 1, row + 1), col)
-    elif direction == 'down':
-        return (max(0, row - 1), col)
-    elif direction == 'left':
-        return (row, max(0, col - 1))
-    elif direction == 'right':
-        return (row, min(grid_size - 1, col + 1))
-    else:
-        return agent_pos
 
 if __name__ == "__main__":
     grid_size = 6
@@ -36,8 +23,12 @@ if __name__ == "__main__":
         plot_grid(grid_size, agent_pos, goal_pos, image_path=image_path)
         print(f"Grid saved as '{image_path}'")
 
+        valid_actions = get_valid_actions(agent_pos, grid_size)
+        prompt = build_prompt_single(agent_pos, goal_pos, valid_actions, grid_size)
+
         print("Sending image to the model...")
-        prompt, response = send_image_to_model_openai(image_path, agent_pos, goal_pos, grid_size=grid_size)
+
+        response = send_image_to_model_openai(image_path, prompt, temperature=0.0000001)
         print(f"\n\nPrompt: {prompt}\n\n")
         print(f"LLM response: {response}\n\n")
 
@@ -50,14 +41,14 @@ if __name__ == "__main__":
             print("No valid direction found, stopping.")
             break
 
-        new_agent_pos = move_agent(agent_pos, direction, grid_size=grid_size)
+        new_agent_pos = move_agent(agent_pos, direction, grid_size)
         if new_agent_pos == agent_pos:
             print("Move would go out of bounds, ignoring action.")
         else:
             agent_pos = new_agent_pos
             step += 1
 
-    print("\n✅ Goal reached!")
+    print("\nGoal reached!")
     # The optimal path length:
     optimal_path_length = abs(init_agent_pos[0] - goal_pos[0]) + abs(init_agent_pos[1] - goal_pos[1])
     print(f"Optimal path length: {optimal_path_length}")

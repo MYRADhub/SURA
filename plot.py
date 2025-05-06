@@ -6,8 +6,6 @@ def plot_grid(grid_size, agent_pos, goal_pos, image_path="grid.png"):
     grid = np.ones((grid_size, grid_size, 3))
 
     # Set colors
-    # grid[agent_pos] = [0.5, 0.5, 0.5]     # Gray (agent)
-    # grid[goal_pos] = [0, 0, 0]            # Black (goal)
     grid[agent_pos] = [0, 0, 0]             # Black (agent)
     grid[goal_pos] = [1, 0, 0]              # Red (goal)
 
@@ -26,7 +24,7 @@ def plot_grid(grid_size, agent_pos, goal_pos, image_path="grid.png"):
     plt.axvline(grid_size + margin, color='blue', linewidth=16)     # Right (vertical blue)
     plt.axvline(0 - margin, color='yellow', linewidth=16)           # Left (vertical yellow)
     plt.axhline(grid_size + margin, color='green', linewidth=16)    # Top (horizontal green)
-    plt.axhline(0 - margin, color='orange', linewidth=16)             # Bottom (horizontal orange)
+    plt.axhline(0 - margin, color='orange', linewidth=16)           # Bottom (horizontal orange)
 
     # Set limits so grid does not extend under the boundary lines
     plt.gca().set_xlim([0 - margin, grid_size + margin])

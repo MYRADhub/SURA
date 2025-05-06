@@ -1,7 +1,7 @@
 import random
 from plot import plot_grid
 from agent import send_image_to_model_openai
-from main import move_agent
+from utils import get_valid_actions, move_agent, build_prompt_single
 
 MAX_STEPS = 30
 GRID_SIZE = 6
@@ -22,8 +22,10 @@ def run_single_episode():
     while agent_pos != goal_pos and step < MAX_STEPS:
         plot_grid(GRID_SIZE, agent_pos, goal_pos, image_path=IMAGE_PATH)
 
-        prompt, response = send_image_to_model_openai(
-            IMAGE_PATH, agent_pos, goal_pos, grid_size=GRID_SIZE
+        valid_actions = get_valid_actions(agent_pos, GRID_SIZE)
+        prompt = build_prompt_single(agent_pos, goal_pos, valid_actions, GRID_SIZE)
+        response = send_image_to_model_openai(
+            IMAGE_PATH, prompt, temperature=0.0000001
         )
 
         # Extract direction
