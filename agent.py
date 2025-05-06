@@ -17,7 +17,7 @@ def get_valid_actions(agent_pos, grid_size):
         actions.append("right")
     return actions
 
-def build_prompt(agent_pos, target_pos, valid_actions):
+def build_prompt(agent_pos, target_pos, valid_actions, grid_size=8):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
     return f"""
 You are looking at an 8x8 grid world that has colored borders to indicate direction:
@@ -34,7 +34,7 @@ Inside the grid:
 Each square can be referenced by a (row, column) coordinate.
 - Coordinates are zero-indexed.
 - (0, 0) is the **bottom-left** corner of the grid.
-- (7, 7) is the **top-right** corner.
+- ({grid_size-1}, {grid_size-1}) is the **top-right** corner.
 
 Current situation:
 - Agent is at **(row {agent_pos[0]}, column {agent_pos[1]})**
@@ -51,7 +51,7 @@ Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
 
 def send_image_to_model_ollama(image_path, agent_pos, target_pos, grid_size):
     valid_actions = get_valid_actions(agent_pos, grid_size)
-    prompt = build_prompt(agent_pos, target_pos, valid_actions)
+    prompt = build_prompt(agent_pos, target_pos, valid_actions, grid_size=grid_size)
     
     response = ollama.chat(
         model='llava',
@@ -90,9 +90,10 @@ def send_image_to_model_openai(image_path, agent_pos, target_pos, grid_size):
                         "type": "input_image",
                         "image_url": f"data:image/png;base64,{base64_image}",
                     },
-                ],
+                ]
             }
         ],
+        temperature=0.0000001
     )
     return (prompt, response.output_text.strip().lower())
 

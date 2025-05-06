@@ -6,8 +6,10 @@ def plot_grid(grid_size, agent_pos, goal_pos, image_path="grid.png"):
     grid = np.ones((grid_size, grid_size, 3))
 
     # Set colors
-    grid[agent_pos] = [0.5, 0.5, 0.5]  # Gray (agent)
-    grid[goal_pos] = [0, 0, 0]         # Black (goal)
+    # grid[agent_pos] = [0.5, 0.5, 0.5]     # Gray (agent)
+    # grid[goal_pos] = [0, 0, 0]            # Black (goal)
+    grid[agent_pos] = [0, 0, 0]             # Black (agent)
+    grid[goal_pos] = [1, 0, 0]              # Red (goal)
 
     # Plot and save
     plt.imshow(grid, extent=[0, grid_size, 0, grid_size], origin='lower')
