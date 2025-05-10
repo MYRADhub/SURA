@@ -1,5 +1,5 @@
 import random
-from plot import plot_grid
+from plot_1_agent import plot_grid
 from agent import send_image_to_model_openai, send_image_to_model_ollama
 from utils import get_valid_actions, move_agent, build_prompt_single
 
