@@ -91,3 +91,117 @@ Avoid colliding with the other agent if possible.
 
 Respond with one word only: {', '.join([f'**{a}**' for a in valid_actions])}
 """
+
+def build_prompt_single_obs(agent_pos, goal_pos, valid_actions, grid_size, obstacles):
+    action_list = ', '.join([f"**{a}**" for a in valid_actions])
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    return f"""
+You are looking at an {grid_size}x{grid_size} grid world that has colored borders to indicate direction:
+
+- The **top** border is **green** — this is the **up** direction.
+- The **bottom** border is **gray** — this is the **down** direction.
+- The **left** border is **yellow** — this is the **left** direction.
+- The **right** border is **blue** — this is the **right** direction.
+
+Inside the grid:
+- The **black square** is the agent.
+- The **red square** is the goal.
+- **Brown squares** represent obstacles that cannot be entered.
+
+Coordinates are zero-indexed.
+- (0, 0) is the bottom-left corner
+- ({grid_size - 1}, {grid_size - 1}) is the top-right corner
+
+Current situation:
+- Agent is at **(row {agent_pos[0]}, column {agent_pos[1]})**
+- Goal is at **(row {goal_pos[0]}, column {goal_pos[1]})**
+- Obstacles are at: {obs_coords}
+
+Valid directions from the agent's current position:
+{action_list}
+
+Your task:
+Help the agent move **one step closer** to the goal while avoiding obstacles.
+Only choose from the valid directions listed.
+
+Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
+"""
+
+def build_prompt_first_agent_obs(agent1_pos, agent2_pos, goal1_pos, valid_actions, grid_size, obstacles):
+    action_list = ', '.join([f"**{a}**" for a in valid_actions])
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    return f"""
+You are Agent 1 (the **black square**) in an {grid_size}x{grid_size} grid world.
+
+Grid orientation:
+- **Green** top border = up
+- **Gray** bottom border = down
+- **Yellow** left border = left
+- **Blue** right border = right
+
+Inside the grid:
+- **You** are the **black square**
+- **Agent 2** is the **gray square**
+- **Your goal** is the **red square**
+- **Another goal** (not yours) is the **orange square**
+- **Brown squares** are **obstacles** that block movement
+
+Coordinates are zero-indexed:
+- (0, 0) = bottom-left
+- ({grid_size - 1}, {grid_size - 1}) = top-right
+
+State:
+- You are at **(row {agent1_pos[0]}, column {agent1_pos[1]})**
+- Agent 2 is at **(row {agent2_pos[0]}, column {agent2_pos[1]})**
+- Your goal is at **(row {goal1_pos[0]}, column {goal1_pos[1]})**
+- Obstacles are at: {obs_coords}
+
+Valid directions for you:
+{action_list}
+
+Your task:
+Move one step toward your goal while avoiding obstacles and other agents.
+
+Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
+"""
+
+def build_prompt_second_agent_obs(agent1_pos, agent2_pos, goal2_pos, valid_actions, grid_size, obstacles):
+    action_list = ', '.join([f"**{a}**" for a in valid_actions])
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    return f"""
+You are Agent 2 (the **gray square**) in an {grid_size}x{grid_size} grid world.
+
+Grid orientation:
+- **Green** top border = up
+- **Gray** bottom border = down
+- **Yellow** left border = left
+- **Blue** right border = right
+
+Inside the grid:
+- **You** are the **gray square**
+- **Agent 1** is the **black square**
+- **Your goal** is the **orange square**
+- **Another goal** (not yours) is the **red square**
+- **Brown squares** are **obstacles** that block movement
+
+Coordinates are zero-indexed:
+- (0, 0) = bottom-left
+- ({grid_size - 1}, {grid_size - 1}) = top-right
+
+State:
+- You are at **(row {agent2_pos[0]}, column {agent2_pos[1]})**
+- Agent 1 is at **(row {agent1_pos[0]}, column {agent1_pos[1]})**
+- Your goal is at **(row {goal2_pos[0]}, column {goal2_pos[1]})**
+- Obstacles are at: {obs_coords}
+
+Valid directions for you:
+{action_list}
+
+Your task:
+Move one step toward your goal while avoiding obstacles and other agents.
+
+Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
+"""

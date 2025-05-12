@@ -12,7 +12,7 @@ def extract_direction(response):
 
 if __name__ == "__main__":
     grid_size = 6
-    image_path = "data/grid_2_agents.png"
+    image_path = "data/grid.png"
     
     env = GridWorld(grid_size)
     env.initialize_agents_goals(num_agents=2)
