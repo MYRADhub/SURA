@@ -1,29 +1,3 @@
-def get_valid_actions(agent_pos, grid_size):
-    row, col = agent_pos
-    actions = []
-    if row < grid_size - 1:
-        actions.append("up")
-    if row > 0:
-        actions.append("down")
-    if col > 0:
-        actions.append("left")
-    if col < grid_size - 1:
-        actions.append("right")
-    return actions
-
-def move_agent(agent_pos, direction, grid_size):
-    row, col = agent_pos
-    if direction == 'up':
-        return (min(grid_size - 1, row + 1), col)
-    elif direction == 'down':
-        return (max(0, row - 1), col)
-    elif direction == 'left':
-        return (row, max(0, col - 1))
-    elif direction == 'right':
-        return (row, min(grid_size - 1, col + 1))
-    else:
-        return agent_pos
-    
 def build_prompt_single(agent_pos, target_pos, valid_actions, grid_size):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
     return f"""
@@ -56,7 +30,6 @@ Help the agent move **one step closer** to the goal, using only one of the **val
 Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])} — based on the image.
 """
 
-# Add these new functions to utils.py
 def build_prompt_first_agent(agent1_pos, agent2_pos, goal1_pos, valid_actions, grid_size):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
     return f"""

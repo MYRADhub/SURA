@@ -1,49 +1,39 @@
-import random
-from plot_1_agent import plot_grid
-from agent import send_image_to_model_openai
-from utils import get_valid_actions, move_agent, build_prompt_single
+from rendering.plot_1_agent import plot_grid
+from core.agent import send_image_to_model_openai
+from core.prompt import build_prompt_single
+from core.environment import GridWorld
 
 MAX_STEPS = 30
 GRID_SIZE = 6
 NUM_RUNS = 20
-IMAGE_PATH = "grid.png"
-
-def get_random_positions(grid_size):
-    positions = random.sample(range(grid_size * grid_size), 2)
-    agent_pos = divmod(positions[0], grid_size)
-    goal_pos = divmod(positions[1], grid_size)
-    return agent_pos, goal_pos
+IMAGE_PATH = "data/grid.png"
 
 def run_single_episode():
-    agent_pos, goal_pos = get_random_positions(GRID_SIZE)
+    env = GridWorld(GRID_SIZE, obstacles={(1, 1), (3, 3)})
+    env.initialize_agents_goals(num_agents=1)
+
+    agent_pos = env.agents[0]
+    goal_pos = env.goals[0]
     init_agent_pos = agent_pos
     step = 0
 
     while agent_pos != goal_pos and step < MAX_STEPS:
-        plot_grid(GRID_SIZE, agent_pos, goal_pos, image_path=IMAGE_PATH)
+        plot_grid(env, image_path=IMAGE_PATH)
 
-        valid_actions = get_valid_actions(agent_pos, GRID_SIZE)
+        valid_actions = env.get_valid_actions(agent_pos)
         prompt = build_prompt_single(agent_pos, goal_pos, valid_actions, GRID_SIZE)
-        response = send_image_to_model_openai(
-            IMAGE_PATH, prompt, temperature=0.0000001
-        )
+        response = send_image_to_model_openai(IMAGE_PATH, prompt, temperature=0.0000001)
 
-        # Extract direction
-        direction = None
-        for dir_candidate in ['up', 'down', 'left', 'right']:
-            if dir_candidate in response:
-                direction = dir_candidate
-                break
-
+        direction = next((d for d in ['up', 'down', 'left', 'right'] if d in response), None)
         if not direction:
-            break  # Invalid response
-
-        new_pos = move_agent(agent_pos, direction, GRID_SIZE)
-        if new_pos == agent_pos:
-            # Invalid move (would go out of bounds)
             break
+
+        new_pos = env.move_agent(agent_pos, direction)
+        if new_pos == agent_pos:
+            break  # Invalid or blocked
         else:
             agent_pos = new_pos
+            env.agents[0] = agent_pos
             step += 1
 
     optimal_path = abs(init_agent_pos[0] - goal_pos[0]) + abs(init_agent_pos[1] - goal_pos[1])
