@@ -1,4 +1,4 @@
-from rendering.plot_2_agents import plot_grid
+from core.plot import plot_grid
 from core.agent import send_image_to_model_openai
 from core.prompt import build_prompt_first_agent, build_prompt_second_agent
 from core.environment import GridWorld
