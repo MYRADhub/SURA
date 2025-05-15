@@ -73,3 +73,14 @@ class GridWorld:
 
         return new_pos if self.is_valid(new_pos) else agent_pos
 
+    def remove_agent(self, index):
+        if 0 <= index < len(self.agents):
+            self.agents.pop(index)
+        else:
+            raise IndexError("Agent index out of range.")
+        
+    def remove_goal(self, index):
+        if 0 <= index < len(self.goals):
+            self.goals.pop(index)
+        else:
+            raise IndexError("Goal index out of range.")

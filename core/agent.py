@@ -30,6 +30,7 @@ def send_image_to_model_openai(image_path, prompt, temperature=None):
     # Read and encode the image as base64
     base64_image = encode_image(image_path)
 
+    print('Sending request to OpenAI API')
     if temperature:
         response = client.responses.create(
             model="gpt-4o",
@@ -45,7 +46,8 @@ def send_image_to_model_openai(image_path, prompt, temperature=None):
                     ]
                 }
             ],
-            temperature=temperature
+            temperature=temperature,
+            top_p=0.0000001
         )
     else:
         response = client.responses.create(
@@ -63,6 +65,7 @@ def send_image_to_model_openai(image_path, prompt, temperature=None):
                 }
             ]
         )
+    print('Received response')
     return response.output_text.strip().lower()
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ def plot_grid(env: GridWorld, image_path="grid.png"):
 
     for i, agent in enumerate(env.agents):
         color = agent_colors[i % len(agent_colors)]
+        print(f"Agent {i}: {agent} - Color: {color}")
         grid[agent] = color
 
     # Draw goals (warm colors)
