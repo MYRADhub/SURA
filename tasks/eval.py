@@ -1,15 +1,21 @@
 import csv
 import os
 import argparse
-from tasks.agent1 import run as run_1_agent
-from tasks.agent1_obs import run as run_1_agent_obs
-from tasks.agents2 import run as run_2_agents
-from tasks.agents2_obs import run as run_2_agents_obs
+import importlib
 
 GRID_SIZE = 6
 NUM_RUNS = 20
 MAX_STEPS = 30
 IMAGE_PATH = "data/grid.png"
+
+# Add new tasks here: ("task_key", "module.path", is_two_agents)
+TASKS = [
+    ("agent1", "tasks.agent1", False),
+    ("agent1_obs", "tasks.agent1_obs", False),
+    ("agents2", "tasks.agents2", True),
+    ("agents2_obs", "tasks.agents2_obs", True),
+    ("agent1_uct", "tasks.agent1_uct", False)
+]
 
 def extract_direction(response):
     for d in ['up', 'down', 'left', 'right']:
@@ -65,19 +71,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agents",
         type=str,
-        choices=["1_agent", "1_agent_obs", "2_agents", "2_agents_obs"],
+        choices=[task[0] for task in TASKS],
         nargs="+",
-        default=["1_agent", "1_agent_obs", "2_agents", "2_agents_obs"],
-        help="Specify which agents to evaluate (space separated, e.g. --agents 1_agent 2_agents)."
+        default=[task[0] for task in TASKS],
+        help="Specify which agents to evaluate (space separated, e.g. --agents agent1 agents2)."
     )
     args = parser.parse_args()
 
-    agent_configs = {
-        "1_agent": (run_1_agent, False),
-        "1_agent_obs": (run_1_agent_obs, False),
-        "2_agents": (run_2_agents, True),
-        "2_agents_obs": (run_2_agents_obs, True),
-    }
+    # Dynamically import run functions
+    agent_configs = {}
+    for key, module_path, is_two_agents in TASKS:
+        module = importlib.import_module(module_path)
+        agent_configs[key] = (module.run, is_two_agents)
 
     for agent in args.agents:
         runner, is_two_agents = agent_configs[agent]
