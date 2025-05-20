@@ -205,3 +205,77 @@ Move one step toward your goal while avoiding obstacles and other agents.
 
 Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
 """
+
+
+
+# now we will build prompts for UCT graph construction by using log probs as weights
+
+# first make 4 prompts for the 4 directions with yes and no
+
+def build_yesno_prompt_single_obs(agent_pos, goal_pos, grid_size, obstacles, direction):
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    return f"""
+You are looking at a {grid_size}x{grid_size} grid world with colored borders to indicate direction:
+
+- Green top border → **up**
+- Gray bottom border → **down**
+- Yellow left border → **left**
+- Blue right border → **right**
+
+Inside the grid:
+- The **black square** is the agent.
+- The **red square** is the goal.
+- **Brown squares** are obstacles — they block movement.
+
+Coordinates are zero-indexed:
+- (0, 0) is the bottom-left
+- ({grid_size - 1}, {grid_size - 1}) is the top-right
+
+Current state:
+- Agent position: **(row {agent_pos[0]}, column {agent_pos[1]})**
+- Goal position: **(row {goal_pos[0]}, column {goal_pos[1]})**
+- Obstacles: {obs_coords}
+
+Action under consideration:
+- Should the agent move **{direction}**?
+
+Only respond with **YES** or **NO**.
+"""
+
+# second make one prompt for the 4 directions
+
+def build_multichoice_prompt_single_obs(agent_pos, goal_pos, valid_actions, grid_size, obstacles):
+    action_list = ', '.join([f"**{a}**" for a in valid_actions])
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    return f"""
+You are looking at a {grid_size}x{grid_size} grid world with colored borders to indicate direction:
+
+- Green top border → **up**
+- Gray bottom border → **down**
+- Yellow left border → **left**
+- Blue right border → **right**
+
+Inside the grid:
+- The **black square** is the agent.
+- The **red square** is the goal.
+- **Brown squares** are obstacles — they block movement.
+
+Coordinates are zero-indexed:
+- (0, 0) is the bottom-left
+- ({grid_size - 1}, {grid_size - 1}) is the top-right
+
+Current state:
+- Agent is at: **(row {agent_pos[0]}, column {agent_pos[1]})**
+- Goal is at: **(row {goal_pos[0]}, column {goal_pos[1]})**
+- Obstacles are at: {obs_coords}
+
+Your task:
+Select the best direction to move that brings the agent closer to the goal and avoids obstacles.
+
+Valid directions are:
+{action_list}
+
+Respond with one word only — the chosen direction.
+"""
