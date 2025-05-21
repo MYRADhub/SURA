@@ -126,6 +126,8 @@ Help the agent move **one step closer** to the goal while avoiding obstacles.
 Only choose from the valid directions listed.
 
 Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
+
+MAKE SURE to respond with one word only, all lowercase, not bolded, not capitalized, and without any extra context or explanation.
 """
 
 def build_prompt_first_agent_obs(agent1_pos, agent2_pos, goal1_pos, valid_actions, grid_size, obstacles):
