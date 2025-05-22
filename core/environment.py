@@ -44,6 +44,27 @@ class GridWorld:
             used.add(goal)
             self.goals.append(goal)
 
+    def initialize_agents_goals_custom(self, agents, goals):
+        """
+        Initialize agents and goals with provided positions.
+        Args:
+            agents: list of (row, col) tuples for agent positions
+            goals: list of (row, col) tuples for goal positions
+        Raises:
+            ValueError if any position is invalid or overlapping
+        """
+        if len(agents) != len(goals):
+            raise ValueError("Number of agents and goals must match.")
+
+        used = set(self.obstacles)
+        for pos in agents + goals:
+            if pos in used or not self.is_valid(pos):
+                raise ValueError(f"Invalid or overlapping position: {pos}")
+            used.add(pos)
+
+        self.agents = list(agents)
+        self.goals = list(goals)
+
     def get_valid_actions(self, agent_pos):
         row, col = agent_pos
         actions = []

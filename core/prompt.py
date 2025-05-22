@@ -93,7 +93,7 @@ Respond with one word only: {', '.join([f'**{a}**' for a in valid_actions])}
 """
 
 def build_prompt_single_obs(agent_pos, goal_pos, valid_actions, grid_size, obstacles):
-    action_list = ', '.join([f"**{a}**" for a in valid_actions])
+    action_list = ', '.join([f"{a}" for a in valid_actions])
     obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
 
     return f"""
@@ -120,14 +120,15 @@ Current situation:
 
 Valid directions from the agent's current position:
 {action_list}
+You can only move one step in one of these directions.
 
 Your task:
 Help the agent move **one step closer** to the goal while avoiding obstacles.
 Only choose from the valid directions listed.
 
-Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
+Respond with **one word only**: {', '.join([f'{a}' for a in valid_actions])}
 
-MAKE SURE to respond with one word only, all lowercase, not bolded, not capitalized, and without any extra context or explanation.
+MAKE SURE to respond with one word only, CHOSEN FROM {action_list}, all lowercase, not bolded, not capitalized, and without any extra context or explanation.
 """
 
 def build_prompt_first_agent_obs(agent1_pos, agent2_pos, goal1_pos, valid_actions, grid_size, obstacles):
@@ -175,11 +176,12 @@ def build_prompt_single_obs_v2(
     valid_actions,
     grid_size,
     obstacles,
-    memory               # e.g. [(1, 3, "up", 2, 3), (2, 3, "left", 2, 2), (2, 2, "down", 1, 2)]
+    memory, # e.g. [(1, 3, "up", 2, 3), ...]
+    visits # e.g. {(2,3): 2, (1,2): 1, ...}
 ):
     action_list = ", ".join([f"{a}" for a in valid_actions])
 
-    # format last-5 moves (most recent first)
+    # Memory section
     if memory:
         history_lines = "\n".join(
             [f"  • {i+1}. you moved from (row {x0}, col {y0}) **{dir_}** → got to (row {x1}, col {y1})"
@@ -188,7 +190,29 @@ def build_prompt_single_obs_v2(
     else:
         history_lines = "  • (no prior moves — this is the first step)"
 
+    # Obstacle string
     obs_coords = ", ".join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    # Move analysis
+    move_analysis = []
+    for direction in valid_actions:
+        # Determine resulting cell
+        r, c = agent_pos
+        if direction == "up":
+            target = (r + 1, c)
+        elif direction == "down":
+            target = (r - 1, c)
+        elif direction == "left":
+            target = (r, c - 1)
+        elif direction == "right":
+            target = (r, c + 1)
+        else:
+            continue  # skip invalid direction (just in case)
+
+        count = visits.get(target, 0)
+        move_analysis.append(f"  • {direction:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+
+    move_analysis_block = "\n".join(move_analysis)
 
     return f"""
 **Environment**
@@ -212,6 +236,9 @@ Current state
 **Memory (last 5 moves)**  
 {history_lines}
 
+**Move Analysis (cell visit frequency)**  
+{move_analysis_block}
+
 ---
 
 ### Instructions (think silently, output nothing but the chosen word)
@@ -228,6 +255,7 @@ Current state
 
 Now choose the best move.
 """
+
 
 
 def build_prompt_second_agent_obs(agent1_pos, agent2_pos, goal2_pos, valid_actions, grid_size, obstacles):
