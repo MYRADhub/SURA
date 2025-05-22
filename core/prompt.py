@@ -169,6 +169,67 @@ Move one step toward your goal while avoiding obstacles and other agents.
 Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
 """
 
+def build_prompt_single_obs_v2(
+    agent_pos,
+    goal_pos,
+    valid_actions,
+    grid_size,
+    obstacles,
+    memory               # e.g. [(1, 3, "up", 2, 3), (2, 3, "left", 2, 2), (2, 2, "down", 1, 2)]
+):
+    action_list = ", ".join([f"{a}" for a in valid_actions])
+
+    # format last-5 moves (most recent first)
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {x0}, col {y0}) **{dir_}** → got to (row {x1}, col {y1})"
+             for i, (x0, y0, dir_, x1, y1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    obs_coords = ", ".join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    return f"""
+**Environment**
+
+You are controlling a single black square (the *agent*) on a {grid_size}×{grid_size} grid.
+Four thick coloured borders indicate global orientation:
+
+* green (top) → **up**
+* gray (bottom) → **down**
+* yellow (left) → **left**
+* blue (right) → **right**
+
+Inside the grid each cell is referenced by **zero-indexed coordinates** — (0 , 0) is the bottom-left corner, ({grid_size-1} , {grid_size-1}) the top-right.
+A red square marks the goal; brown squares are immovable obstacles the agent **cannot** enter.
+
+Current state  
+* agent position … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* goal   position … **(row {goal_pos[0]}, col {goal_pos[1]})**  
+* obstacle cells  … {obs_coords or "none"}
+
+**Memory (last 5 moves)**  
+{history_lines}
+
+---
+
+### Instructions (think silently, output nothing but the chosen word)
+
+1. **Legal moves** – from your current square you may move exactly one step in any of these directions: {action_list}.  
+   Trying to step into an obstacle leaves you in the same place.
+2. **Primary objective** – pick the move that *reduces the Manhattan distance* to the red goal whenever possible.
+3. **Look-ahead** – mentally consider the next one-to-two steps to avoid dead-ends or traps.
+4. **No blind repetition** – avoid repeating the previous direction unless it clearly improves progress.
+5. **Obstacle awareness** – never select a direction that collides with a brown square.
+6. **Finish rule** – when the agent reaches the goal coordinate, no further moves are required.
+7. **Output format** – respond with **one lowercase word only** ({action_list}).  
+   *Do not add punctuation, boldface, extra spaces, or any extra explanation.*
+
+Now choose the best move.
+"""
+
+
 def build_prompt_second_agent_obs(agent1_pos, agent2_pos, goal2_pos, valid_actions, grid_size, obstacles):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
     obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
