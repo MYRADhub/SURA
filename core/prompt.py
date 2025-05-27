@@ -105,9 +105,11 @@ You are looking at an {grid_size}x{grid_size} grid world that has colored border
 - The **right** border is **blue** — this is the **right** direction.
 
 Inside the grid:
-- The **black square** is the agent.
+- The **blue square** is the agent.
 - The **red square** is the goal.
-- **Brown squares** represent obstacles that cannot be entered.
+- **Black squares** represent obstacles that cannot be entered.
+- Each cell is labeled with its **(row, column)** coordinate for easy reference.
+- The rows and columns are also labeled numerically on the grid image itself to help you orient the space.
 
 Coordinates are zero-indexed.
 - (0, 0) is the bottom-left corner
@@ -130,6 +132,7 @@ Respond with **one word only**: {', '.join([f'{a}' for a in valid_actions])}
 
 MAKE SURE to respond with one word only, CHOSEN FROM {action_list}, all lowercase, not bolded, not capitalized, and without any extra context or explanation.
 """
+
 
 def build_prompt_first_agent_obs(agent1_pos, agent2_pos, goal1_pos, valid_actions, grid_size, obstacles):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
@@ -176,12 +179,12 @@ def build_prompt_single_obs_v2(
     valid_actions,
     grid_size,
     obstacles,
-    memory, # e.g. [(1, 3, "up", 2, 3), ...]
-    visits # e.g. {(2,3): 2, (1,2): 1, ...}
+    memory,
+    visits
 ):
     action_list = ", ".join([f"{a}" for a in valid_actions])
 
-    # Memory section
+    # Memory
     if memory:
         history_lines = "\n".join(
             [f"  • {i+1}. you moved from (row {x0}, col {y0}) **{dir_}** → got to (row {x1}, col {y1})"
@@ -190,13 +193,12 @@ def build_prompt_single_obs_v2(
     else:
         history_lines = "  • (no prior moves — this is the first step)"
 
-    # Obstacle string
+    # Obstacles
     obs_coords = ", ".join([f"({r}, {c})" for r, c in sorted(obstacles)])
 
     # Move analysis
     move_analysis = []
     for direction in valid_actions:
-        # Determine resulting cell
         r, c = agent_pos
         if direction == "up":
             target = (r + 1, c)
@@ -207,17 +209,15 @@ def build_prompt_single_obs_v2(
         elif direction == "right":
             target = (r, c + 1)
         else:
-            continue  # skip invalid direction (just in case)
-
+            continue
         count = visits.get(target, 0)
         move_analysis.append(f"  • {direction:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
-
     move_analysis_block = "\n".join(move_analysis)
 
     return f"""
 **Environment**
 
-You are controlling a single black square (the *agent*) on a {grid_size}×{grid_size} grid.
+You are controlling a single blue square (the *agent*) on a {grid_size}×{grid_size} grid.
 Four thick coloured borders indicate global orientation:
 
 * green (top) → **up**
@@ -225,8 +225,16 @@ Four thick coloured borders indicate global orientation:
 * yellow (left) → **left**
 * blue (right) → **right**
 
-Inside the grid each cell is referenced by **zero-indexed coordinates** — (0 , 0) is the bottom-left corner, ({grid_size-1} , {grid_size-1}) the top-right.
-A red square marks the goal; brown squares are immovable obstacles the agent **cannot** enter.
+Inside the grid:
+* The **blue square** labeled **A1** is the agent you control  
+* The **red square** labeled **G1** is the goal you need to reach  
+* **Black squares** are immovable obstacles and cannot be entered , they are labeled **OBS** 
+* Each grid cell includes labeled **row and column indices** to help with position reference  
+* The top and left edges of the image contain axis annotations for **rows** and **columns**
+
+All coordinates are zero-indexed:
+- (0, 0) is the bottom-left corner
+- ({grid_size - 1}, {grid_size - 1}) is the top-right corner
 
 Current state  
 * agent position … **(row {agent_pos[0]}, col {agent_pos[1]})**  
@@ -243,14 +251,14 @@ Current state
 
 ### Instructions (think silently, output nothing but the chosen word)
 
-1. **Legal moves** – from your current square you may move exactly one step in any of these directions: {action_list}.  
+1. **Legal moves** - from your current square you may move exactly one step in any of these directions: {action_list}.  
    Trying to step into an obstacle leaves you in the same place.
-2. **Primary objective** – pick the move that *reduces the Manhattan distance* to the red goal whenever possible.
-3. **Look-ahead** – mentally consider the next one-to-two steps to avoid dead-ends or traps.
-4. **No blind repetition** – avoid repeating the previous direction unless it clearly improves progress.
-5. **Obstacle awareness** – never select a direction that collides with a brown square.
-6. **Finish rule** – when the agent reaches the goal coordinate, no further moves are required.
-7. **Output format** – respond with **one lowercase word only** ({action_list}).  
+2. **Primary objective** - pick the move that *reduces the Manhattan distance* to the red goal whenever possible.
+3. **Look-ahead** - mentally consider the next one-to-two steps to avoid dead-ends or traps.
+4. **No blind repetition** - avoid repeating the previous direction unless it clearly improves progress.
+5. **Obstacle awareness** - never select a direction that collides with a black square.
+6. **Finish rule** - when the agent reaches the goal coordinate, no further moves are required.
+7. **Output format** - respond with **one lowercase word only** ({action_list}).  
    *Do not add punctuation, boldface, extra spaces, or any extra explanation.*
 
 Now choose the best move.
@@ -297,12 +305,6 @@ Move one step toward your goal while avoiding obstacles and other agents.
 Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
 """
 
-
-
-# now we will build prompts for UCT graph construction by using log probs as weights
-
-# first make 4 prompts for the 4 directions with yes and no
-
 def build_yesno_prompt_single_obs(agent_pos, goal_pos, grid_size, obstacles, direction):
     obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
 
@@ -334,39 +336,96 @@ Action under consideration:
 Only respond with **YES** or **NO**.
 """
 
-# second make one prompt for the 4 directions
-
-def build_multichoice_prompt_single_obs(agent_pos, goal_pos, valid_actions, grid_size, obstacles):
-    action_list = ', '.join([f"**{a}**" for a in valid_actions])
+def build_yesno_prompt_single_obs_v2(
+    agent_pos,
+    goal_pos,
+    grid_size,
+    obstacles,
+    direction,
+    memory,  # list of (r0, c0, dir, r1, c1)
+    visits   # dict {(r, c): count}
+):
+    # Format obstacle list
     obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
 
+    # Format memory (up to 5 recent moves)
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → got to (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Format move analysis
+    move_analysis_lines = []
+    for d in ['up', 'down', 'left', 'right']:
+        r, c = agent_pos
+        if d == "up":
+            target = (r + 1, c)
+        elif d == "down":
+            target = (r - 1, c)
+        elif d == "left":
+            target = (r, c - 1)
+        elif d == "right":
+            target = (r, c + 1)
+        else:
+            continue
+        count = visits.get(target, 0)
+        move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+    move_analysis = "\n".join(move_analysis_lines)
+
     return f"""
-You are looking at a {grid_size}x{grid_size} grid world with colored borders to indicate direction:
+**Environment**
 
-- Green top border → **up**
-- Gray bottom border → **down**
-- Yellow left border → **left**
-- Blue right border → **right**
+You are controlling a blue square (the agent labeled **A1**) on a {grid_size}×{grid_size} grid.  
+A red square labeled **G1** marks the goal.  
+Black squares are obstacles that **cannot be entered**.
 
-Inside the grid:
-- The **black square** is the agent.
-- The **red square** is the goal.
-- **Brown squares** are obstacles — they block movement.
+Four colored borders define direction:
+* green (top) → **up**
+* gray (bottom) → **down**
+* yellow (left) → **left**
+* blue (right) → **right**
 
-Coordinates are zero-indexed:
-- (0, 0) is the bottom-left
-- ({grid_size - 1}, {grid_size - 1}) is the top-right
+All coordinates are zero-indexed:
+- (0, 0) is the bottom-left corner
+- ({grid_size - 1}, {grid_size - 1}) is the top-right corner
 
-Current state:
-- Agent is at: **(row {agent_pos[0]}, column {agent_pos[1]})**
-- Goal is at: **(row {goal_pos[0]}, column {goal_pos[1]})**
-- Obstacles are at: {obs_coords}
+In the image:
+- Each cell is labeled with its row and column index
+- Obstacles are black squares
+- Your agent is labeled A1
+- The goal is labeled G1
 
-Your task:
-Select the best direction to move that brings the agent closer to the goal and avoids obstacles.
+**Current state**  
+* Agent position … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* Goal position  … **(row {goal_pos[0]}, col {goal_pos[1]})**  
+* Obstacles      … {obs_coords or "none"}
 
-Valid directions are:
-{action_list}
+**Memory (last 5 moves)**  
+{history_lines}
 
-Respond with one word only — the chosen direction.
+**Move Analysis (cell visit frequency)**  
+{move_analysis}
+
+---
+
+### Question
+
+Should the agent move **{direction}**?
+
+---
+
+### Instructions (read carefully before responding)
+
+1. **Legal actions** - consider if this direction avoids obstacles and is allowed from the current position.
+2. **Goal-seeking** - prioritize moving toward the red goal.
+3. **Avoid repetition** - if the same move has been repeated without progress, say NO unless it clearly helps.
+4. **Trap avoidance** - avoid directions that lead to dead ends or repeated loops.
+5. **Output format** - respond with exactly one word: YES or NO. Uppercase, no punctuation, no extra text, not bolded.
+   *Do not include any other explanation, characters, or formatting.*
+
+Now respond: YES or NO
 """
+

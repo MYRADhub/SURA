@@ -2,55 +2,73 @@ import matplotlib.pyplot as plt
 import numpy as np
 from core.environment import GridWorld
 
-def plot_grid(env: GridWorld, image_path="grid.png"):
+def plot_grid(env: GridWorld, image_path="data/grid.png"):
     grid = np.ones((env.size, env.size, 3))
 
-    # Draw obstacles
+    # Draw obstacles (black)
     for pos in env.obstacles:
-        grid[pos] = [0.4, 0.2, 0]  # Brown
+        grid[pos] = [0.0, 0.0, 0.0]  # Black
 
-    # Draw agents (grayscale)
-    agent_colors = [
-        [0.0, 0.0, 0.0],       # Black
-        [0.5, 0.5, 0.5],       # Gray
-        [0.2, 0.2, 0.2],       # Dark gray
-        [0.7, 0.7, 0.7],       # Light gray
-    ]
+    # Draw agents (blue)
+    agent_color = [0.0, 0.4, 1.0]  # Blue
+    for agent in env.agents:
+        grid[agent] = agent_color
 
-    for i, agent in enumerate(env.agents):
-        color = agent_colors[i % len(agent_colors)]
-        grid[agent] = color
+    # Draw goals (red)
+    goal_color = [1.0, 0.0, 0.0]  # Red
+    for goal in env.goals:
+        grid[goal] = goal_color
 
-    # Draw goals (warm colors)
-    goal_colors = [
-        [1.0, 0.0, 0.0],       # Red
-        [1.0, 0.5, 0.0],       # Orange
-        [1.0, 0.7, 0.3],       # Lighter orange
-        [0.9, 0.3, 0.3],       # Salmon
-    ]
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.imshow(grid, extent=[0, env.size, 0, env.size], origin='lower')
 
-    for i, goal in enumerate(env.goals):
-        color = goal_colors[i % len(goal_colors)]
-        grid[goal] = color
-
-    # Draw grid
-    plt.imshow(grid, extent=[0, env.size, 0, env.size], origin='lower')
+    # Grid lines
     for x in range(env.size + 1):
-        plt.axhline(x, color='gray', linewidth=0.5)
-        plt.axvline(x, color='gray', linewidth=0.5)
+        ax.axhline(x, color='gray', linewidth=0.5)
+        ax.axvline(x, color='gray', linewidth=0.5)
 
-    # Draw border directions
+    # Axis ticks
+    ax.set_xticks(np.arange(env.size) + 0.5)
+    ax.set_yticks(np.arange(env.size) + 0.5)
+    ax.set_xticklabels([f"col {i}" for i in range(env.size)])
+    ax.set_yticklabels([f"row {i}" for i in range(env.size)])
+    ax.tick_params(axis='both', which='both', length=0)
+
+    # Add text annotations
+    for r in range(env.size):
+        for c in range(env.size):
+            label = ""
+            if (r, c) in env.obstacles:
+                label = "OBS"
+            elif (r, c) in env.agents:
+                idx = env.agents.index((r, c))
+                label = f"A{idx + 1}"
+            elif (r, c) in env.goals:
+                idx = env.goals.index((r, c))
+                label = f"G{idx + 1}"
+            if label:
+                ax.text(
+                    c + 0.5, r + 0.5, label,
+                    color="white",
+                    fontsize=12,
+                    ha='center',
+                    va='center',
+                    weight='bold'
+                )
+
+    # Border directions
     margin = 0.5
-    plt.axvline(env.size + margin, color='blue', linewidth=16)    # Right
-    plt.axvline(0 - margin, color='yellow', linewidth=16)         # Left
-    plt.axhline(env.size + margin, color='green', linewidth=16)   # Top
-    plt.axhline(0 - margin, color='orange', linewidth=16)         # Bottom
+    ax.axvline(env.size + margin, color='blue', linewidth=16)    # Right
+    ax.axvline(0 - margin, color='yellow', linewidth=16)         # Left
+    ax.axhline(env.size + margin, color='green', linewidth=16)   # Top
+    ax.axhline(0 - margin, color='orange', linewidth=16)         # Bottom
 
-    plt.gca().set_xlim([0 - margin, env.size + margin])
-    plt.gca().set_ylim([0 - margin, env.size + margin])
+    ax.set_xlim([-margin, env.size + margin])
+    ax.set_ylim([-margin, env.size + margin])
     plt.axis('off')
     plt.savefig(image_path, bbox_inches='tight')
     plt.close()
+
 
 # Test usage
 if __name__ == "__main__":

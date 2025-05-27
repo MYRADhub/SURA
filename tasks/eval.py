@@ -4,7 +4,7 @@ import argparse
 import importlib
 
 GRID_SIZE = 6
-NUM_RUNS = 50
+NUM_RUNS = 100
 MAX_STEPS = 30
 IMAGE_PATH = "data/grid.png"
 
@@ -14,7 +14,8 @@ TASKS = [
     ("agent1_obs", "tasks.agent1_obs", False),
     ("agents2", "tasks.agents2", True),
     ("agents2_obs", "tasks.agents2_obs", True),
-    ("agent1_uct", "tasks.agent1_uct", False)
+    ("agent1_uct", "tasks.agent1_uct", False),
+    ("agent1_yesno", "tasks.agent1_yesno", False)
 ]
 
 

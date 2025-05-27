@@ -10,9 +10,12 @@ def extract_direction(response):
             return d
     return None
 
-def run(grid_size=6, image_path="data/grid.png", max_steps=30):
+def run(grid_size=6, image_path="data/grid.png", max_steps=30, agent_start=None, goal_pos=None):
     env = GridWorld(grid_size)
-    env.initialize_agents_goals(num_agents=1)
+    if agent_start and goal_pos:
+        env.initialize_agents_goals_custom(agents=[agent_start], goals=[goal_pos])
+    else:
+        env.initialize_agents_goals(num_agents=1)
 
     agent_pos = env.agents[0]
     goal_pos = env.goals[0]
