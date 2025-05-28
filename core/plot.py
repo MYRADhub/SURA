@@ -66,6 +66,35 @@ def plot_grid(env: GridWorld, image_path="data/grid.png"):
     ax.set_xlim([-margin, env.size + margin])
     ax.set_ylim([-margin, env.size + margin])
     plt.axis('off')
+
+        # Draw diagonal walls between diagonally adjacent obstacles
+    for r in range(env.size - 1):
+        for c in range(env.size - 1):
+            # Check 2x2 square corners for diagonally placed obstacles
+            tl = (r + 1, c)     # top-left
+            tr = (r + 1, c + 1) # top-right
+            bl = (r, c)         # bottom-left
+            br = (r, c + 1)     # bottom-right
+
+            if tl in env.obstacles and br in env.obstacles and tr not in env.obstacles and bl not in env.obstacles:
+                # draw line from center of tl to br
+                ax.plot(
+                    [c + 0.5, c + 1.5],
+                    [r + 1.5, r + 0.5],
+                    color='black',
+                    linewidth=10,
+                    solid_capstyle='round'
+                )
+            elif tr in env.obstacles and bl in env.obstacles and tl not in env.obstacles and br not in env.obstacles:
+                # draw line from center of tr to bl
+                ax.plot(
+                    [c + 1.5, c + 0.5],
+                    [r + 1.5, r + 0.5],
+                    color='black',
+                    linewidth=10,
+                    solid_capstyle='round'
+                )
+
     plt.savefig(image_path, bbox_inches='tight')
     plt.close()
 
