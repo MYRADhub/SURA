@@ -1,8 +1,9 @@
 from core.environment import GridWorld
-from core.prompt import build_yesno_prompt_single_obs_v2
+from core.prompt import build_yesno_prompt_single_obs_v2, build_yesno_prompt_single_obs
 from core.agent import send_image_to_model_openai_logprobs
 from core.plot import plot_grid
 from core.utils import shortest_path_length
+import time
 
 def extract_yes_logprob(logprobs):
     """Extract logprob for the token 'yes' from OpenAI response"""
@@ -51,10 +52,15 @@ def run(
             prompt = build_yesno_prompt_single_obs_v2(
                 agent_pos, goal_pos, grid_size, obstacles, direction, memory, visits
             )
+            # prompt = build_yesno_prompt_single_obs(
+            #     agent_pos, goal_pos, grid_size, obstacles, direction
+            # )
+            time.sleep(0.5)  # Avoid rate limiting
             sentence, logprobs = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
             logprob_yes = extract_yes_logprob(logprobs)
             action_scores[direction] = logprob_yes
             print(f"{direction.upper():5} → logprob(yes): {logprob_yes:.3f}")
+        time.sleep(1)  # Give time for the model to process
 
         if not action_scores:
             print("❌ No direction could be chosen.")

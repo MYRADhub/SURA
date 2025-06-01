@@ -40,12 +40,12 @@ def run(
         visits[agent_pos] = visits.get(agent_pos, 0) + 1
 
         valid_actions = env.get_valid_actions(agent_pos)
-        # prompt = build_prompt_single_obs_v2(
-        #     agent_pos, goal_pos, valid_actions, grid_size, obstacles, memory, visits
-        # )
-        prompt = build_prompt_single_obs(
-            agent_pos, goal_pos, valid_actions, grid_size, obstacles
+        prompt = build_prompt_single_obs_v2(
+            agent_pos, goal_pos, valid_actions, grid_size, obstacles, memory, visits
         )
+        # prompt = build_prompt_single_obs(
+        #     agent_pos, goal_pos, valid_actions, grid_size, obstacles
+        # )
         print(f"Valid actions: {valid_actions}")
         # print(f"Prompt: {prompt}")
         response = send_image_to_model_openai(image_path, prompt, temperature=0.0000001)
