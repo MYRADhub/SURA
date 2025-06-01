@@ -133,46 +133,6 @@ Respond with **one word only**: {', '.join([f'{a}' for a in valid_actions])}
 MAKE SURE to respond with one word only, CHOSEN FROM {action_list}, all lowercase, not bolded, not capitalized, and without any extra context or explanation.
 """
 
-
-def build_prompt_first_agent_obs(agent1_pos, agent2_pos, goal1_pos, valid_actions, grid_size, obstacles):
-    action_list = ', '.join([f"**{a}**" for a in valid_actions])
-    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
-
-    return f"""
-You are Agent 1 (the **black square**) in an {grid_size}x{grid_size} grid world.
-
-Grid orientation:
-- **Green** top border = up
-- **Gray** bottom border = down
-- **Yellow** left border = left
-- **Blue** right border = right
-
-Inside the grid:
-- **You** are the **black square**
-- **Agent 2** is the **gray square**
-- **Your goal** is the **red square**
-- **Another goal** (not yours) is the **orange square**
-- **Brown squares** are **obstacles** that block movement
-
-Coordinates are zero-indexed:
-- (0, 0) = bottom-left
-- ({grid_size - 1}, {grid_size - 1}) = top-right
-
-State:
-- You are at **(row {agent1_pos[0]}, column {agent1_pos[1]})**
-- Agent 2 is at **(row {agent2_pos[0]}, column {agent2_pos[1]})**
-- Your goal is at **(row {goal1_pos[0]}, column {goal1_pos[1]})**
-- Obstacles are at: {obs_coords}
-
-Valid directions for you:
-{action_list}
-
-Your task:
-Move one step toward your goal while avoiding obstacles and other agents.
-
-Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
-"""
-
 def build_prompt_single_obs_v2(
     agent_pos,
     goal_pos,
@@ -261,10 +221,52 @@ Current state
 7. **Output format** - respond with **one lowercase word only** ({action_list}).  
    *Do not add punctuation, boldface, extra spaces, or any extra explanation.*
 
+**Important:** If two black obstacle squares touch at the corners (diagonally), a thick black line will connect them.
+This indicates that the agent **cannot pass diagonally** between those cells.
+
+You must treat this diagonal as a wall — only cardinal (up/down/left/right) movements are allowed, and diagonal movement is not possible under any condition.
+
 Now choose the best move.
 """
 
+def build_prompt_first_agent_obs(agent1_pos, agent2_pos, goal1_pos, valid_actions, grid_size, obstacles):
+    action_list = ', '.join([f"**{a}**" for a in valid_actions])
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
 
+    return f"""
+You are Agent 1 (the **black square**) in an {grid_size}x{grid_size} grid world.
+
+Grid orientation:
+- **Green** top border = up
+- **Gray** bottom border = down
+- **Yellow** left border = left
+- **Blue** right border = right
+
+Inside the grid:
+- **You** are the **black square**
+- **Agent 2** is the **gray square**
+- **Your goal** is the **red square**
+- **Another goal** (not yours) is the **orange square**
+- **Brown squares** are **obstacles** that block movement
+
+Coordinates are zero-indexed:
+- (0, 0) = bottom-left
+- ({grid_size - 1}, {grid_size - 1}) = top-right
+
+State:
+- You are at **(row {agent1_pos[0]}, column {agent1_pos[1]})**
+- Agent 2 is at **(row {agent2_pos[0]}, column {agent2_pos[1]})**
+- Your goal is at **(row {goal1_pos[0]}, column {goal1_pos[1]})**
+- Obstacles are at: {obs_coords}
+
+Valid directions for you:
+{action_list}
+
+Your task:
+Move one step toward your goal while avoiding obstacles and other agents.
+
+Respond with **one word only**: {', '.join([f'**{a}**' for a in valid_actions])}
+"""
 
 def build_prompt_second_agent_obs(agent1_pos, agent2_pos, goal2_pos, valid_actions, grid_size, obstacles):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
@@ -426,6 +428,121 @@ Should the agent move **{direction}**?
 5. **Output format** - respond with exactly one word: YES or NO. Uppercase, no punctuation, no extra text, not bolded.
    *Do not include any other explanation, characters, or formatting.*
 
+**Important:** If two black obstacle squares touch at the corners (diagonally), a thick black line will connect them.
+This indicates that the agent **cannot pass diagonally** between those cells.
+
+You must treat this diagonal as a wall — only cardinal (up/down/left/right) movements are allowed, and diagonal movement is not possible under any condition.
+
 Now respond: YES or NO
 """
 
+def build_yesno_prompt_multiagent(
+    agent_id,
+    agent_pos,
+    goal_pos,
+    other_agents,  # list of tuples (other_agent_id, position)
+    grid_size,
+    obstacles,
+    direction,
+    memory,   # list of (r0, c0, dir, r1, c1)
+    visits    # dict {(r, c): count}
+):
+    # Format obstacle coordinates
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    # Format memory
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → got to (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Format move analysis
+    move_analysis_lines = []
+    for d in ['up', 'down', 'left', 'right']:
+        r, c = agent_pos
+        if d == "up":
+            target = (r + 1, c)
+        elif d == "down":
+            target = (r - 1, c)
+        elif d == "left":
+            target = (r, c - 1)
+        elif d == "right":
+            target = (r, c + 1)
+        else:
+            continue
+        count = visits.get(target, 0)
+        move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+    move_analysis = "\n".join(move_analysis_lines)
+
+    # Format other agents and their positions
+    if other_agents:
+        other_agent_lines = "\n".join(
+            [f"  • Agent A{aid} is at (row {pos[0]}, col {pos[1]})" for aid, pos in other_agents]
+        )
+    else:
+        other_agent_lines = "  • (no other agents present)"
+
+    return f"""
+**Environment**
+
+You are Agent **A{agent_id}** (a blue square labeled **A{agent_id}**) on a {grid_size}×{grid_size} grid.  
+Your goal is a red square labeled **G{agent_id}**.  
+Black squares are obstacles that **cannot be entered**.  
+Other agents may be present — they are shown as blue squares with labels (A2, A3, etc.).  
+Their goals are also marked with red squares labeled accordingly (G2, G3, ...).
+
+Four colored borders define direction:
+* green (top) → **up**
+* gray (bottom) → **down**
+* yellow (left) → **left**
+* blue (right) → **right**
+
+All coordinates are zero-indexed:
+- (0, 0) is the bottom-left corner
+- ({grid_size - 1}, {grid_size - 1}) is the top-right corner
+
+In the image:
+- Each cell is labeled with its row and column index
+- Obstacles are black squares labeled **OBS**
+- You are labeled **A{agent_id}**
+- Your goal is labeled **G{agent_id}**
+- Other agents are labeled A2, A3, etc.
+- Other goals are labeled G2, G3, etc.
+
+**Current state**  
+* Your position         … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* Your goal             … **(row {goal_pos[0]}, col {goal_pos[1]})**  
+* Obstacles             … {obs_coords or "none"}  
+* Other agents          …  
+{other_agent_lines}
+
+**Memory (last 5 moves)**  
+{history_lines}
+
+**Move Analysis (cell visit frequency)**  
+{move_analysis}
+
+---
+
+### Question
+
+Should Agent A{agent_id} move **{direction}**?
+
+---
+
+### Instructions (read carefully before responding)
+
+1. **Legal actions** - determine if this direction is valid and avoids obstacles.
+2. **Goal-seeking** - prioritize reducing the distance to your goal **G{agent_id}**.
+3. **Avoid repetition** - if this move was repeated without progress, say NO unless clearly helpful.
+4. **Trap avoidance** - avoid moves that cause loops or dead ends.
+5. **Collision avoidance** - do not move into a cell currently occupied by other agents.
+6. **Output format** - respond with exactly one word: YES or NO. Uppercase only, no punctuation or explanation.
+7. **Diagonal rule** - if two obstacles touch diagonally, a thick black line indicates you cannot pass through that corner.
+   Treat these diagonals as walls. Only up/down/left/right movement is allowed.
+
+Now respond: YES or NO
+"""
