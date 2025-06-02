@@ -39,7 +39,7 @@ def plot_grid(env: GridWorld, image_path="data/grid.png"):
         for c in range(env.size):
             label = ""
             if (r, c) in env.obstacles:
-                label = "OBS"
+                label = "O"
             elif (r, c) in env.agents:
                 idx = env.agents.index((r, c))
                 label = f"A{idx + 1}"

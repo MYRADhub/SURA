@@ -188,7 +188,7 @@ Four thick coloured borders indicate global orientation:
 Inside the grid:
 * The **blue square** labeled **A1** is the agent you control  
 * The **red square** labeled **G1** is the goal you need to reach  
-* **Black squares** are immovable obstacles and cannot be entered , they are labeled **OBS** 
+* **Black squares** are immovable obstacles and cannot be entered , they are labeled **O** 
 * Each grid cell includes labeled **row and column indices** to help with position reference  
 * The top and left edges of the image contain axis annotations for **rows** and **columns**
 
@@ -506,7 +506,7 @@ All coordinates are zero-indexed:
 
 In the image:
 - Each cell is labeled with its row and column index
-- Obstacles are black squares labeled **OBS**
+- Obstacles are black squares labeled **O**
 - You are labeled **A{agent_id}**
 - Your goal is labeled **G{agent_id}**
 - Other agents are labeled A2, A3, etc.

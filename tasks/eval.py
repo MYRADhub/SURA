@@ -2,116 +2,125 @@ import csv
 import os
 import argparse
 import importlib
+import random
+from core.utils import is_reachable
 
-GRID_SIZE = 6
-NUM_RUNS = 100
-MAX_STEPS = 30
-IMAGE_PATH = "data/grid.png"
+MAX_STEPS = 100
+GRID_SIZE = 20
+TRIALS_PER_CONFIG = 2
+RANDOM_SEED = 42
+IMAGE_PATH_TEMPLATE = "data/grid.png"
 
-# Add new tasks here: ("task_key", "module.path", is_two_agents)
+# (task_key, module_path)
 TASKS = [
-    ("agent1", "tasks.agent1", False),
-    ("agent1_obs", "tasks.agent1_obs", False),
-    ("agents2", "tasks.agents2", True),
-    ("agents2_obs", "tasks.agents2_obs", True),
-    ("agent1_uct", "tasks.agent1_uct", False),
-    ("agent1_yesno", "tasks.agent1_yesno", False)
+    ("agent1", "tasks.agent1"),
+    ("agent1_obs", "tasks.agent1_obs"),
+    ("agent1_yesno", "tasks.agent1_yesno"),
+    ("agent1_uct", "tasks.agent1_uct"),
 ]
 
+NUM_OBSTACLE_WORLDS = 5
+AGENT_GOAL_PAIRS_PER_WORLD = 2
 
-def extract_direction(response):
-    for d in ['up', 'down', 'left', 'right']:
-        if d in response.lower():
-            return d
-    return None
+def generate_random_obstacles(grid_size, num_obstacles=20, avoid=set()):
+    obstacles = set()
+    while len(obstacles) < num_obstacles:
+        r = random.randint(0, grid_size - 1)
+        c = random.randint(0, grid_size - 1)
+        cell = (r, c)
+        if cell not in avoid:
+            obstacles.add(cell)
+    return obstacles
 
-def evaluate(task_name, runner, is_two_agents=False):
-    print(f"\n=== Evaluating {task_name} ===")
-    total_steps = total_opt = fails = total_collisions = 0
-    llm_disagree_total = 0
-    log_file = f"results/{task_name}_results.csv"
-    summary_file = f"results/{task_name}_summary.txt"
-    if not os.path.exists("results"):
-        os.makedirs("results")
+def generate_random_positions(grid_size, count, avoid=set()):
+    positions = set()
+    while len(positions) < count:
+        pos = (random.randint(0, grid_size - 1), random.randint(0, grid_size - 1))
+        if pos not in avoid:
+            positions.add(pos)
+    return list(positions)
+
+def evaluate_random(task_key, run_fn):
+    print(f"\n=== Evaluating Random Worlds: {task_key} ===")
+    os.makedirs("results", exist_ok=True)
+    log_file = f"results/{task_key}_random_results.csv"
+    summary_file = f"results/{task_key}_random_summary.txt"
     write_header = not os.path.exists(log_file)
 
+    total_steps = total_opt = fails = 0
+    total_cases = 0
+
+    random.seed(RANDOM_SEED)
     with open(log_file, mode='a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         if write_header:
-            if is_two_agents:
-                writer.writerow(["Episode", "Steps", "Optimal", "Failed", "Collisions"])
-            else:
-                writer.writerow(["Episode", "Steps", "Optimal", "Failed"])
-        for i in range(NUM_RUNS):
-            print(f"Episode {i+1}/{NUM_RUNS}...")
-            # Handle UCT tasks with llm_disagree_count
-            if "uct" in task_name:
-                if is_two_agents:
-                    steps, optimal, failed, collisions, llm_disagree_count = runner()
-                    total_collisions += collisions
-                else:
-                    steps, optimal, failed, llm_disagree_count = runner()
-                llm_disagree_total += llm_disagree_count
-            else:
-                if is_two_agents:
-                    steps, optimal, failed, collisions = result = runner()
-                    total_collisions += collisions
-                else:
-                    steps, optimal, failed = result = runner()
-            if is_two_agents:
-                writer.writerow([i+1, steps, optimal, int(failed), total_collisions])
-            else:
-                writer.writerow([i+1, steps, optimal, int(failed)])
+            writer.writerow(["World", "Pair", "Trial", "Steps", "Optimal", "Failed"])
 
-            total_steps += steps
-            total_opt += optimal
-            if failed:
-                fails += 1
+        for w in range(NUM_OBSTACLE_WORLDS):
+            print(f"\n--- Obstacle World {w+1} ---")
+            # Temporarily generate dummy positions to avoid placing obstacles there
+            dummy_positions = {(0, 0), (GRID_SIZE - 1, GRID_SIZE - 1)}
+            obstacles = generate_random_obstacles(GRID_SIZE, avoid=dummy_positions)
 
-    avg_steps = total_steps / NUM_RUNS
-    avg_opt = total_opt / NUM_RUNS
+            # Generate valid agent-goal pairs that don’t overlap with obstacles and are reachable
+            pairs = []
+            attempts = 0
+            while len(pairs) < AGENT_GOAL_PAIRS_PER_WORLD and attempts < 100:
+                agent_pos, goal_pos = generate_random_positions(GRID_SIZE, 2, avoid=obstacles)
+                if agent_pos != goal_pos and is_reachable(GRID_SIZE, agent_pos, goal_pos, obstacles):
+                    pairs.append((agent_pos, goal_pos))
+                attempts += 1
+
+            for p, (agent_pos, goal_pos) in enumerate(pairs):
+
+                for t in range(TRIALS_PER_CONFIG):
+                    print(f"World {w+1}, Pair {p+1}, Trial {t+1} — Agent {agent_pos} → Goal {goal_pos}")
+                    steps, optimal, failed = run_fn(
+                        grid_size=GRID_SIZE,
+                        agent_start=agent_pos,
+                        goal_pos=goal_pos,
+                        obstacles=obstacles,
+                        image_path=IMAGE_PATH_TEMPLATE,
+                        max_steps=MAX_STEPS
+                    )
+                    writer.writerow([w+1, p+1, t+1, steps, optimal, int(failed)])
+                    total_steps += steps
+                    total_opt += optimal
+                    fails += int(failed)
+                    total_cases += 1
+
+    avg_steps = total_steps / total_cases
+    avg_opt = total_opt / total_cases
     diff = avg_steps - avg_opt
     percent = (diff / avg_opt) * 100 if avg_opt else 0
 
     summary_lines = [
+        f"Evaluated {total_cases} trials across 5 random obstacle worlds × 2 random agent-goal pairs × 2 trials",
         f"Average optimal path: {avg_opt:.2f}",
         f"Average steps taken: {avg_steps:.2f}",
         f"Difference: {diff:.2f} ({percent:.2f}%)",
-        f"Failures (max steps): {fails}/{NUM_RUNS}"
+        f"Failures (max steps): {fails}/{total_cases}",
+        f"Results saved to {log_file}"
     ]
-    if is_two_agents:
-        summary_lines.append(f"Collisions: {total_collisions} total")
-    if "uct" in task_name:
-        summary_lines.append(f"LLM/UCT disagreement count: {llm_disagree_total}")
-    summary_lines.append(f"Results saved to {log_file}")
 
-    print(f"\n{task_name} Summary")
-    for line in summary_lines:
-        print(f"{line}")
-
-    with open(summary_file, 'w') as f:
-        for line in summary_lines:
-            f.write(f"{line}\n")
-
+    print("\n".join(summary_lines))
+    with open(summary_file, "w") as f:
+        f.writelines(line + "\n" for line in summary_lines)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate GridWorld agents.")
+    parser = argparse.ArgumentParser(description="Evaluate agents on random GridWorlds.")
     parser.add_argument(
         "--agents",
         type=str,
-        choices=[task[0] for task in TASKS],
+        choices=[t[0] for t in TASKS],
         nargs="+",
-        default=[task[0] for task in TASKS],
-        help="Specify which agents to evaluate (space separated, e.g. --agents agent1 agents2)."
+        default=[t[0] for t in TASKS],
+        help="Which agents to evaluate (e.g. --agents agent1 agent1_yesno)"
     )
     args = parser.parse_args()
 
-    # Dynamically import run functions
-    agent_configs = {}
-    for key, module_path, is_two_agents in TASKS:
+    selected_tasks = {key: mod for (key, mod) in TASKS if key in args.agents}
+    for key, module_path in selected_tasks.items():
         module = importlib.import_module(module_path)
-        agent_configs[key] = (module.run, is_two_agents)
-
-    for agent in args.agents:
-        runner, is_two_agents = agent_configs[agent]
-        evaluate(agent, runner, is_two_agents)
+        run_fn = module.run
+        evaluate_random(key, run_fn)
