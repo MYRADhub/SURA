@@ -546,3 +546,97 @@ Should Agent A{agent_id} move **{direction}**?
 
 Now respond: YES or NO
 """
+
+def build_yesno_code_prompt_single(
+    agent_pos,
+    goal_pos,
+    grid_size,
+    obstacles,
+    direction,
+    memory,  # list of (r0, c0, dir, r1, c1)
+    visits   # dict {(r, c): count}
+):
+    # Format obstacle code lines
+    obstacle_lines = "\n".join([f"obstacles.add(({r}, {c}))" for r, c in sorted(obstacles)])
+
+    # Format memory (up to 5 recent moves)
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → got to (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Format move analysis
+    move_analysis_lines = []
+    for d in ['up', 'down', 'left', 'right']:
+        r, c = agent_pos
+        if d == "up":
+            target = (r + 1, c)
+        elif d == "down":
+            target = (r - 1, c)
+        elif d == "left":
+            target = (r, c - 1)
+        elif d == "right":
+            target = (r, c + 1)
+        else:
+            continue
+        count = visits.get(target, 0)
+        move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+    move_analysis = "\n".join(move_analysis_lines)
+
+    return f"""
+**Environment**
+
+Below is a Python-style setup of the GridWorld environment.  
+This code defines the grid, the agent (A1), the goal (G1), and obstacles.  
+Only cardinal moves (up, down, left, right) are allowed — no diagonals.
+
+```python
+grid_size = {grid_size}
+
+agent_pos = {agent_pos}
+goal_pos = {goal_pos}
+
+obstacles = set()
+{obstacle_lines}
+```
+
+You are currently at `agent_pos`, and your goal is to reach `goal_pos`.
+
+You will be shown an image of the current state. The image corresponds exactly to the variables above.
+
+Your agent is labeled **A1**, the goal is **G1**, and obstacles are black squares.
+The grid is 0-indexed. (0, 0) is bottom-left. ({grid_size - 1}, {grid_size - 1}) is top-right.
+
+**Memory (last 5 moves)**
+{history_lines}
+
+**Move Analysis (cell visit frequency)**
+{move_analysis}
+
+---
+
+### Question
+
+Should the agent move **{direction}**?
+
+---
+
+### Instructions (read carefully before responding)
+
+1. **Legal actions** - consider if this direction avoids obstacles and is allowed from the current position.
+2. **Goal-seeking** - prioritize moving toward the red goal.
+3. **Avoid repetition** - if the same move has been repeated without progress, say NO unless it clearly helps.
+4. **Trap avoidance** - avoid directions that lead to dead ends or repeated loops.
+5. **Output format** - respond with exactly one word: YES or NO. Uppercase, no punctuation, no extra text, not bolded.
+   *Do not include any other explanation, characters, or formatting.*
+
+**Important:** If two black obstacle squares touch at the corners (diagonally), a thick black line will connect them.
+This indicates that the agent **cannot pass diagonally** between those cells.
+
+You must treat this diagonal as a wall — only cardinal (up/down/left/right) movements are allowed, and diagonal movement is not possible under any condition.
+
+Now respond: YES or NO
+"""
