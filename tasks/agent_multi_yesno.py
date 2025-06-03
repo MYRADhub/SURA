@@ -3,7 +3,6 @@ from core.prompt import build_yesno_prompt_multiagent
 from core.agent import send_image_to_model_openai_logprobs
 from core.plot import plot_grid
 from core.utils import shortest_path_length
-import random
 import time
 
 def extract_yes_logprob(logprobs):
@@ -89,11 +88,16 @@ def run(obstacles={(1, 1), (2, 3), (4, 2), (3, 4)}, grid_size=6, image_path="dat
                 deleted[i] = True
                 to_remove.append(i)
 
-        # Remove agents and goals in reverse order to keep indices valid
+        # Remove agents and goals by position to avoid index errors
         for i in sorted(to_remove, reverse=True):
-            env.remove_agent(i)
-            env.remove_goal(i)
+            agent_pos = agent_positions[i]
+            goal_pos = goal_positions[i]
+            if agent_pos in env.agents:
+                env.agents.remove(agent_pos)
+            if goal_pos in env.goals:
+                env.goals.remove(goal_pos)
             agent_positions[i] = None
+
 
         step += 1
 
