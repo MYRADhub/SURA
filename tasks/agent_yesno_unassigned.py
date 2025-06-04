@@ -15,20 +15,29 @@ def extract_yes_logprob(logprobs):
 
 def run(obstacles={(2, 2), (3, 3), (4, 1)}, grid_size=6, image_path="data/grid.png", max_steps=30, num_agents=3):
     env = GridWorld(grid_size, obstacles=obstacles)
-    env.initialize_agents_goals(num_agents=num_agents)
+    # env.initialize_agents_goals(num_agents=num_agents)
+    env.initialize_agents_goals_custom(
+        agents=[(0, 0), (0, 1), (0, 2)],
+        goals=[(1, 0), (5, 0), (0, 5)]
+    )
 
     agent_positions = env.agents[:]
-    goal_positions = env.goals[:]
-    init_positions = env.agents[:]
+    agent_ids = list(range(1, num_agents + 1))
     active = [True] * num_agents
-    deleted = [False] * num_agents
     visits = [{} for _ in range(num_agents)]
     memories = [[] for _ in range(num_agents)]
     step = 0
     collisions = 0
+    # Compute optimal steps (hypothetical, assuming original assignment)
+    total_opt = 0
+    for start in env.agents:
+        if start is None:
+            continue
+        dists = [shortest_path_length(start, g, env) for g in env.goals if g is not None]
+        total_opt += min(dists) if dists else 0
 
     print(f"Initial agent positions: {agent_positions}")
-    print(f"Goal positions: {goal_positions}")
+    print(f"Goal positions: {env.goals}")
     print(f"Obstacles: {obstacles}")
 
     while any(active) and step < max_steps:
@@ -37,25 +46,25 @@ def run(obstacles={(2, 2), (3, 3), (4, 1)}, grid_size=6, image_path="data/grid.p
         proposals = agent_positions[:]
 
         for i in range(num_agents):
-            if not active[i] or deleted[i]:
+            if not active[i] or agent_positions[i] is None:
                 continue
 
-            print(f"\nAgent {i+1} at position {agent_positions[i]}")
+            print(f"\nAgent {agent_ids[i]} at position {agent_positions[i]}")
             visits[i][agent_positions[i]] = visits[i].get(agent_positions[i], 0) + 1
             valid = env.get_valid_actions(agent_positions[i])
-            print(f"Valid moves for Agent {i+1}: {valid}")
+            print(f"Valid moves for Agent {agent_ids[i]}: {valid}")
             scores = {}
 
             for d in valid:
                 other_infos = [
-                    (j + 1, agent_positions[j])
+                    (agent_ids[j], agent_positions[j])
                     for j in range(num_agents)
-                    if j != i and not deleted[j]
+                    if j != i and agent_positions[j] is not None
                 ]
                 prompt = build_yesno_prompt_unassigned_goals(
-                    agent_id=i + 1,
+                    agent_id=agent_ids[i],
                     agent_pos=agent_positions[i],
-                    goal_positions=goal_positions,
+                    goal_positions=env.goals,
                     other_agents=other_infos,
                     grid_size=grid_size,
                     obstacles=obstacles,
@@ -63,67 +72,57 @@ def run(obstacles={(2, 2), (3, 3), (4, 1)}, grid_size=6, image_path="data/grid.p
                     memory=memories[i],
                     visits=visits[i]
                 )
-                print(f"Agent {i+1} prompt for direction {d}: {prompt[:200]}...")  # Print first 200 chars
+                print(f"Agent {agent_ids[i]} prompt for direction {d}: {prompt[:200]}...")
                 time.sleep(0.5)
                 _, logprobs = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
                 score = extract_yes_logprob(logprobs)
                 scores[d] = score
-                print(f"Agent {i+1} logprob for direction {d}: {score}")
+                print(f"Agent {agent_ids[i]} logprob for direction {d}: {score}")
 
             if scores:
                 best = max(scores, key=scores.get)
-                print(f"Agent {i+1} chooses direction {best} with logprob {scores[best]}")
+                print(f"Agent {agent_ids[i]} chooses direction {best} with logprob {scores[best]}")
                 proposals[i] = env.move_agent(agent_positions[i], best)
-                print(f"Agent {i+1} moves from {agent_positions[i]} to {proposals[i]}")
+                print(f"Agent {agent_ids[i]} moves from {agent_positions[i]} to {proposals[i]}")
                 memories[i].append((agent_positions[i][0], agent_positions[i][1], best, proposals[i][0], proposals[i][1]))
                 if len(memories[i]) > 5:
                     memories[i] = memories[i][-5:]
             else:
-                print(f"Agent {i+1} has no valid moves and stays at {agent_positions[i]}")
+                print(f"Agent {agent_ids[i]} has no valid moves and stays at {agent_positions[i]}")
                 proposals[i] = agent_positions[i]
 
         # Collision resolution
         new_positions = proposals[:]
         for i in range(num_agents):
             for j in range(i + 1, num_agents):
-                if new_positions[i] == new_positions[j] and not deleted[i] and not deleted[j]:
+                if new_positions[i] == new_positions[j] and agent_positions[i] is not None and agent_positions[j] is not None:
                     collisions += 1
-                    print(f"Collision detected between Agent {i+1} and Agent {j+1} at {new_positions[i]}")
+                    print(f"Collision detected between Agent {agent_ids[i]} and Agent {agent_ids[j]} at {new_positions[i]}")
                     new_positions[j] = agent_positions[j]  # loser stays
 
         agent_positions = new_positions
         print(f"Agent positions after moves: {agent_positions}")
-        env.agents = [pos for i, pos in enumerate(agent_positions) if not deleted[i]]
+        env.agents = agent_positions[:]
 
         # Goal claiming logic
         to_remove = []
         for i in range(num_agents):
-            if not active[i] or deleted[i]:
+            if not active[i] or agent_positions[i] is None:
                 continue
-            if agent_positions[i] in goal_positions:
-                print(f"Agent {i+1} reached a goal at {agent_positions[i]}")
+            if agent_positions[i] in env.goals:
+                print(f"Agent {agent_ids[i]} reached a goal at {agent_positions[i]}")
                 active[i] = False
-                deleted[i] = True
                 to_remove.append(i)
 
-        for i in sorted(to_remove, reverse=True):
-            agent_pos = agent_positions[i]
-            if agent_pos in env.agents:
-                env.agents.remove(agent_pos)
-            if agent_pos in env.goals:
-                env.goals.remove(agent_pos)
+        for i in to_remove:
             agent_positions[i] = None
+            env.agents[i] = None
+            env.goals[i] = None
 
-        print(f"Active agents: {[i+1 for i, a in enumerate(active) if a and not deleted[i]]}")
+        print(f"Active agents: {[agent_ids[i] for i in range(num_agents) if active[i] and agent_positions[i] is not None]}")
         print(f"Remaining goals: {env.goals}")
 
         step += 1
-
-    # Compute optimal steps (hypothetical, assuming original assignment)
-    total_opt = 0
-    for start in init_positions:
-        dists = [shortest_path_length(start, g, env) for g in goal_positions]
-        total_opt += min(dists) if dists else 0
 
     failed = step >= max_steps
     print(f"\nRun finished in {step} steps. Collisions: {collisions}. Failed: {failed}")

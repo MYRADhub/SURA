@@ -12,12 +12,14 @@ def plot_grid(env: GridWorld, image_path="data/grid.png"):
     # Draw agents (blue)
     agent_color = [0.0, 0.4, 1.0]  # Blue
     for agent in env.agents:
-        grid[agent] = agent_color
+        if agent is not None:
+            grid[agent] = agent_color
 
     # Draw goals (red)
     goal_color = [1.0, 0.0, 0.0]  # Red
     for goal in env.goals:
-        grid[goal] = goal_color
+        if goal is not None:
+            grid[goal] = goal_color
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.imshow(grid, extent=[0, env.size, 0, env.size], origin='lower')
@@ -40,11 +42,11 @@ def plot_grid(env: GridWorld, image_path="data/grid.png"):
             label = ""
             if (r, c) in env.obstacles:
                 label = "O"
-            elif (r, c) in env.agents:
-                idx = env.agents.index((r, c))
+            elif any((r, c) == pos for pos in env.agents if pos is not None):
+                idx = next(i for i, pos in enumerate(env.agents) if pos == (r, c))
                 label = f"A{idx + 1}"
-            elif (r, c) in env.goals:
-                idx = env.goals.index((r, c))
+            elif any((r, c) == pos for pos in env.goals if pos is not None):
+                idx = next(i for i, pos in enumerate(env.goals) if pos == (r, c))
                 label = f"G{idx + 1}"
             if label:
                 ax.text(
@@ -108,12 +110,14 @@ def plot_grid_unassigned(env: GridWorld, image_path="data/grid.png"):
     # Draw agents (blue)
     agent_color = [0.0, 0.4, 1.0]
     for agent in env.agents:
-        grid[agent] = agent_color
+        if agent is not None:
+            grid[agent] = agent_color
 
     # Draw goals (red)
     goal_color = [1.0, 0.0, 0.0]
     for goal in env.goals:
-        grid[goal] = goal_color
+        if goal is not None:
+            grid[goal] = goal_color
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.imshow(grid, extent=[0, env.size, 0, env.size], origin='lower')
@@ -136,11 +140,11 @@ def plot_grid_unassigned(env: GridWorld, image_path="data/grid.png"):
             label = ""
             if (r, c) in env.obstacles:
                 label = "O"
-            elif (r, c) in env.agents:
-                idx = env.agents.index((r, c))
+            elif any((r, c) == pos for pos in env.agents if pos is not None):
+                idx = next(i for i, pos in enumerate(env.agents) if pos == (r, c))
                 label = f"{idx + 1}"  # Agent labels: 1, 2, 3...
-            elif (r, c) in env.goals:
-                idx = env.goals.index((r, c))
+            elif any((r, c) == pos for pos in env.goals if pos is not None):
+                idx = next(i for i, pos in enumerate(env.goals) if pos == (r, c))
                 label = chr(65 + idx)  # Goal labels: A, B, C...
             if label:
                 ax.text(

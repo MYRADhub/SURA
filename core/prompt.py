@@ -692,14 +692,21 @@ def build_yesno_prompt_unassigned_goals(
 
     # Format goals (unassigned)
     goal_lines = "\n".join(
-        [f"  • Goal {chr(65+i)} is at (row {pos[0]}, col {pos[1]})" for i, pos in enumerate(goal_positions)]
+        [f"  • Goal {chr(65+i)} is at (row {pos[0]}, col {pos[1]})" for i, pos in enumerate(goal_positions) if pos is not None]
     )
+
+    # Dynamically list only the existing goal labels in the environment description
+    existing_goal_labels = [chr(65+i) for i, pos in enumerate(goal_positions) if pos is not None]
+    if existing_goal_labels:
+        goal_label_str = ", ".join([f"**{label}**" for label in existing_goal_labels])
+    else:
+        goal_label_str = "(none)"
 
     return f"""
 **Environment**
 
 You are Agent {agent_id} (a blue square labeled **{agent_id}**) on a {grid_size}×{grid_size} grid.  
-There are several red squares labeled **A**, **B**, **C**, etc. These are **unassigned goals** — you may approach any of them.  
+There are several red squares labeled {goal_label_str}. These are **unassigned goals** — you may approach any of them.  
 Black squares are obstacles that **cannot be entered**.  
 Other agents may be present — they are also shown as blue squares with numeric labels (1, 2, 3, ...).
 
@@ -715,7 +722,7 @@ All coordinates are zero-indexed:
 
 In the image:
 - Obstacles are black squares labeled **O**
-- Goals are red squares labeled **A**, **B**, **C**, etc.
+- Goals are red squares labeled {goal_label_str}
 - You are labeled **{agent_id}**
 - Other agents are labeled numerically
 

@@ -20,31 +20,35 @@ def run(obstacles={(1, 1), (2, 3), (4, 2), (3, 4)}, grid_size=6, image_path="dat
     init_positions = env.agents[:]
     goal_positions = env.goals[:]
     agent_positions = env.agents[:]
+    agent_ids = list(range(1, num_agents + 1))
     active = [True] * num_agents
-    deleted = [False] * num_agents
     visits = [{} for _ in range(num_agents)]
     memories = [[] for _ in range(num_agents)]
     step = 0
     collisions = 0
+    optimal_lengths = [
+        shortest_path_length(init_positions[i], goal_positions[i], env)
+        for i in range(num_agents)
+    ]
 
     while any(active) and step < max_steps:
         plot_grid(env, image_path=image_path)
         proposals = [pos for pos in agent_positions]
 
         for i in range(num_agents):
-            if not active[i] or deleted[i]:
+            if not active[i] or agent_positions[i] is None:
                 continue
             visits[i][agent_positions[i]] = visits[i].get(agent_positions[i], 0) + 1
             valid = env.get_valid_actions(agent_positions[i])
             scores = {}
             for d in valid:
                 other_infos = [
-                    (j + 1, agent_positions[j])
+                    (agent_ids[j], agent_positions[j])
                     for j in range(num_agents)
-                    if j != i and not deleted[j]
+                    if j != i and agent_positions[j] is not None
                 ]
                 prompt = build_yesno_prompt_multiagent(
-                    agent_id=i + 1,
+                    agent_id=agent_ids[i],
                     agent_pos=agent_positions[i],
                     goal_pos=goal_positions[i],
                     other_agents=other_infos,
@@ -54,7 +58,7 @@ def run(obstacles={(1, 1), (2, 3), (4, 2), (3, 4)}, grid_size=6, image_path="dat
                     memory=memories[i],
                     visits=visits[i]
                 )
-                print(f"\nAgent {i + 1} at position {agent_positions[i]}, asking about direction '{d}'")
+                print(f"\nAgent {agent_ids[i]} at position {agent_positions[i]}, asking about direction '{d}'")
                 print(f"Prompt: {prompt[:200]}...")
                 time.sleep(0.5)
                 _, logprobs = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
@@ -72,41 +76,35 @@ def run(obstacles={(1, 1), (2, 3), (4, 2), (3, 4)}, grid_size=6, image_path="dat
         new_positions = proposals[:]
         for i in range(num_agents):
             for j in range(i + 1, num_agents):
-                if new_positions[i] == new_positions[j] and not deleted[i] and not deleted[j]:
+                if (
+                    agent_positions[i] is not None and
+                    agent_positions[j] is not None and
+                    new_positions[i] == new_positions[j]
+                ):
                     collisions += 1
                     # Prioritize agent with lower index
                     new_positions[j] = agent_positions[j]
 
         agent_positions = new_positions
-        env.agents = [pos for i, pos in enumerate(agent_positions) if not deleted[i]]
+        env.agents = agent_positions[:]
 
         # Goal checking and cleanup
         to_remove = []
         for i in range(num_agents):
-            if not active[i] or deleted[i]:
+            if not active[i] or agent_positions[i] is None:
                 continue
             if agent_positions[i] == goal_positions[i]:
                 active[i] = False
-                deleted[i] = True
                 to_remove.append(i)
 
-        # Remove agents and goals by position to avoid index errors
-        for i in sorted(to_remove, reverse=True):
-            agent_pos = agent_positions[i]
-            goal_pos = goal_positions[i]
-            if agent_pos in env.agents:
-                env.agents.remove(agent_pos)
-            if goal_pos in env.goals:
-                env.goals.remove(goal_pos)
+        for i in to_remove:
             agent_positions[i] = None
-
+            env.agents[i] = None
+            goal_positions[i] = None
+            env.goals[i] = None
 
         step += 1
-
-    optimal_lengths = [
-        shortest_path_length(init_positions[i], goal_positions[i], env)
-        for i in range(num_agents)
-    ]
+    
     failed = step >= max_steps
     return step, max(optimal_lengths), failed, collisions
 
