@@ -640,3 +640,116 @@ You must treat this diagonal as a wall — only cardinal (up/down/left/right) mo
 
 Now respond: YES or NO
 """
+
+def build_yesno_prompt_unassigned_goals(
+    agent_id,
+    agent_pos,
+    goal_positions,
+    other_agents,  # list of tuples (other_agent_id, position)
+    grid_size,
+    obstacles,
+    direction,
+    memory,   # list of (r0, c0, dir, r1, c1)
+    visits    # dict {(r, c): count}
+):
+    # Format obstacle coordinates
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    # Format memory
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → got to (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Format move analysis
+    move_analysis_lines = []
+    for d in ['up', 'down', 'left', 'right']:
+        r, c = agent_pos
+        if d == "up":
+            target = (r + 1, c)
+        elif d == "down":
+            target = (r - 1, c)
+        elif d == "left":
+            target = (r, c - 1)
+        elif d == "right":
+            target = (r, c + 1)
+        else:
+            continue
+        count = visits.get(target, 0)
+        move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+    move_analysis = "\n".join(move_analysis_lines)
+
+    # Format other agents
+    if other_agents:
+        other_agent_lines = "\n".join(
+            [f"  • Agent {aid} is at (row {pos[0]}, col {pos[1]})" for aid, pos in other_agents]
+        )
+    else:
+        other_agent_lines = "  • (no other agents present)"
+
+    # Format goals (unassigned)
+    goal_lines = "\n".join(
+        [f"  • Goal {chr(65+i)} is at (row {pos[0]}, col {pos[1]})" for i, pos in enumerate(goal_positions)]
+    )
+
+    return f"""
+**Environment**
+
+You are Agent {agent_id} (a blue square labeled **{agent_id}**) on a {grid_size}×{grid_size} grid.  
+There are several red squares labeled **A**, **B**, **C**, etc. These are **unassigned goals** — you may approach any of them.  
+Black squares are obstacles that **cannot be entered**.  
+Other agents may be present — they are also shown as blue squares with numeric labels (1, 2, 3, ...).
+
+Four colored borders define direction:
+* green (top) → **up**
+* gray (bottom) → **down**
+* yellow (left) → **left**
+* blue (right) → **right**
+
+All coordinates are zero-indexed:
+- (0, 0) is the bottom-left corner
+- ({grid_size - 1}, {grid_size - 1}) is the top-right corner
+
+In the image:
+- Obstacles are black squares labeled **O**
+- Goals are red squares labeled **A**, **B**, **C**, etc.
+- You are labeled **{agent_id}**
+- Other agents are labeled numerically
+
+**Current state**  
+* Your position        … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* Obstacles            … {obs_coords or "none"}  
+* Other agents         …  
+{other_agent_lines}
+* Goal locations       …  
+{goal_lines}
+
+**Memory (last 5 moves)**  
+{history_lines}
+
+**Move Analysis (cell visit frequency)**  
+{move_analysis}
+
+---
+
+### Question
+
+Should Agent {agent_id} move **{direction}**?
+
+---
+
+### Instructions (read carefully before responding)
+
+1. **Legal actions** - do not walk into obstacles or off the grid.
+2. **Goal coverage** - each goal must be reached by one agent, but **goals are unassigned**.
+3. **Coordination assumption** - you cannot communicate with other agents. Avoid chasing the same goal as others if better options exist.
+4. **Global objective** - minimize the **total number of steps** for all agents to reach all goals.
+5. **Don't be greedy** - choosing the nearest goal isn't always optimal for the team.
+6. **Output format** - respond with exactly one word: YES or NO. All caps. No punctuation or extra explanation.
+7. **Diagonal wall rule** - if two obstacles touch at corners, a thick black diagonal means you cannot pass through that diagonal.
+
+Now respond: YES or NO
+"""
