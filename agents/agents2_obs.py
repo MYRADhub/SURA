@@ -1,6 +1,6 @@
 from core.environment import GridWorld
 from core.prompt import build_prompt_first_agent_obs, build_prompt_second_agent_obs, build_prompt_single_obs
-from core.agent import send_image_to_model_openai
+from core.request import send_image_to_model_openai
 from core.plot import plot_grid
 from core.utils import shortest_path_length
 import random

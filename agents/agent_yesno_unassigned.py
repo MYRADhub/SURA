@@ -1,6 +1,6 @@
 from core.environment import GridWorld
 from core.prompt import build_yesno_prompt_unassigned_goals
-from core.agent import send_image_to_model_openai_logprobs
+from core.request import send_image_to_model_openai_logprobs
 from core.plot import plot_grid_unassigned
 from core.utils import shortest_path_length
 import time

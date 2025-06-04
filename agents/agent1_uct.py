@@ -4,7 +4,7 @@ from core.prompt import (
     build_yesno_prompt_single_obs,
     build_prompt_single_obs,
 )
-from core.agent import send_image_to_model_openai_logprobs
+from core.request import send_image_to_model_openai_logprobs
 from core.utils import shortest_path_length
 from math import sqrt, exp, log
 
