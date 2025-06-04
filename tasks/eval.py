@@ -17,12 +17,12 @@ NUM_AGENTS = 3
 
 # (task_key, module_path)
 TASKS = [
-    ("agent1", "tasks.agent1"),
-    ("agent1_obs", "tasks.agent1_obs"),
-    ("agent1_yesno", "tasks.agent1_yesno"),
-    ("agent1_uct", "tasks.agent1_uct"),
-    ("agent1_code", "tasks.agent1_code"),
-    ("agent_multi_yesno", "tasks.agent_multi_yesno"),
+    ("agent1", "agents.agent1"),
+    ("agent1_obs", "agents.agent1_obs"),
+    ("agent1_yesno", "agents.agent1_yesno"),
+    ("agent1_uct", "agents.agent1_uct"),
+    ("agent1_code", "agents.agent1_code"),
+    ("agent_multi_yesno", "agents.agent_multi_yesno"),
 ]
 
 def generate_random_obstacles(grid_size, num_obstacles=NUM_OBSTACLES, avoid=set()):
@@ -149,21 +149,21 @@ if __name__ == "__main__":
     parser.add_argument("--num-worlds", type=int, default=NUM_OBSTACLE_WORLDS, help="Number of obstacle worlds")
     parser.add_argument("--agent-goal-pairs", type=int, default=AGENT_GOAL_PAIRS_PER_WORLD, help="Agent-goal pairs per world")
     parser.add_argument("--num-obstacles", type=int, default=NUM_OBSTACLES, help="Number of obstacles per world")
-    parser.add_argument("--num-agents", type=int, default=NUM_AGENTS, help="Number of agents (for multi-agent tasks)")
+    parser.add_argument("--num-agents", type=int, default=NUM_AGENTS, help="Number of agents (for multi-agent agents)")
     args = parser.parse_args()
 
     # Override constants with args
     IMAGE_PATH = args.image_path
     MAX_STEPS = args.max_steps
     GRID_SIZE = args.grid_size
-    TRIALS_PER_CONFIG = args.trials_per_config
+    TRIALS_PER_CONFIG = args.trials
     NUM_OBSTACLE_WORLDS = args.num_worlds
     AGENT_GOAL_PAIRS_PER_WORLD = args.agent_goal_pairs
     NUM_OBSTACLES = args.num_obstacles
     NUM_AGENTS = args.num_agents
 
-    selected_tasks = {key: mod for (key, mod) in TASKS if key in args.agents}
-    for key, module_path in selected_tasks.items():
+    selected_agents = {key: mod for (key, mod) in TASKS if key in args.agents}
+    for key, module_path in selected_agents.items():
         module = importlib.import_module(module_path)
         run_fn = module.run
         evaluate_random(key, run_fn)

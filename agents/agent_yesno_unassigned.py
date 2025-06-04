@@ -15,11 +15,7 @@ def extract_yes_logprob(logprobs):
 
 def run(obstacles={(2, 2), (3, 3), (4, 1)}, grid_size=6, image_path="data/grid.png", max_steps=30, num_agents=3):
     env = GridWorld(grid_size, obstacles=obstacles)
-    # env.initialize_agents_goals(num_agents=num_agents)
-    env.initialize_agents_goals_custom(
-        agents=[(0, 0), (0, 1), (0, 2)],
-        goals=[(1, 0), (5, 0), (0, 5)]
-    )
+    env.initialize_agents_goals(num_agents=num_agents)
 
     agent_positions = env.agents[:]
     agent_ids = list(range(1, num_agents + 1))

@@ -8,10 +8,10 @@ IMAGE_PATH_TEMPLATE = "data/grid.png"
 
 # Format: (task_key, module.path)
 TASKS = [
-    ("agent1", "tasks.agent1"),
-    ("agent1_obs", "tasks.agent1_obs"),
-    ("agent1_yesno", "tasks.agent1_yesno"),
-    ("agent1_uct", "tasks.agent1_uct")
+    ("agent1", "agents.agent1"),
+    ("agent1_obs", "agents.agent1_obs"),
+    ("agent1_yesno", "agents.agent1_yesno"),
+    ("agent1_uct", "agents.agent1_uct")
 ]
 
 DIFFICULT_CASES = [
