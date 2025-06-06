@@ -3,7 +3,7 @@ from openai import OpenAI
 import base64
 import os
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from core.schema import OpenAIResponse
 
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
@@ -147,11 +147,6 @@ def send_image_to_model_openai_logprobs(image_path, prompt, temperature=None):
     sentence = sentence.lower()
     
     return sentence, logprobs
-
-class OpenAIResponse(BaseModel):
-    choose_direction: str
-    target_goal: str
-    explanation: str
 
 def send_image_to_model_openai_logprobs_formatted(image_path, prompt, temperature=None):
     load_dotenv()

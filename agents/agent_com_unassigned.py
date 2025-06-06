@@ -1,14 +1,15 @@
 from core.environment import GridWorld
 from core.prompt import build_yesno_prompt_unassigned_goals
-from core.request import send_image_to_model_openai_logprobs
+from core.request import send_image_to_model_openai_logprobs_formatted
 from core.plot import plot_grid_unassigned
 from core.utils import shortest_path_length
+from core.schema import OpenAIResponse
 import time
 
 def extract_yes_logprob(logprobs):
     if not logprobs:
         return float('-inf')
-    for item in logprobs[0].top_logprobs:
+    for item in logprobs[4].top_logprobs:
         if item.token.strip() == "YES":
             return item.logprob
     return float('-inf')
@@ -33,9 +34,10 @@ def run(
     active = [True] * num_agents
     visits = [{} for _ in range(num_agents)]
     memories = [[] for _ in range(num_agents)]
+    target_goals = [None for _ in range(num_agents)]  # NEW: tracks declared goals
     step = 0
     collisions = 0
-    # Compute optimal steps (hypothetical, assuming original assignment)
+
     total_opt = 0
     for start in env.agents:
         if start is None:
@@ -77,14 +79,25 @@ def run(
                     obstacles=obstacles,
                     direction=d,
                     memory=memories[i],
-                    visits=visits[i]
+                    visits=visits[i],
+                    agent_targets=target_goals  # NEW: passed to prompt
                 )
-                print(f"Agent {agent_ids[i]} prompt for direction {d}: {prompt[:200]}...")
+                print(f"Agent {agent_ids[i]} prompt for direction {d}: {prompt}...")
                 time.sleep(0.5)
-                _, logprobs = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
+                response_text, logprobs = send_image_to_model_openai_logprobs_formatted(image_path, prompt, temperature=0.0000001)
+                print(f"Agent {agent_ids[i]} response: {response_text[:150]}...")
+                # print(f"Logprobs: {logprobs}")
                 score = extract_yes_logprob(logprobs)
                 scores[d] = score
-                print(f"Agent {agent_ids[i]} logprob for direction {d}: {score}")
+                # print(f"Agent {agent_ids[i]} logprob for direction {d}: {score}")
+
+                if score > -5:  # If the model seems confident, record target
+                    try:
+                        parsed = OpenAIResponse.model_validate_json(response_text)
+                        target_goals[i] = parsed.target_goal  # NEW: update declared target
+                        print(f"Agent {agent_ids[i]} declares target: {parsed.target_goal}")
+                    except Exception as e:
+                        print(f"Warning: Failed to parse structured response: {e}")
 
             if scores:
                 best = max(scores, key=scores.get)
@@ -125,6 +138,7 @@ def run(
             agent_positions[i] = None
             env.agents[i] = None
             env.goals[i] = None
+            target_goals[i] = None  # NEW: clear claimed goal from declared targets
 
         print(f"Active agents: {[agent_ids[i] for i in range(num_agents) if active[i] and agent_positions[i] is not None]}")
         print(f"Remaining goals: {env.goals}")

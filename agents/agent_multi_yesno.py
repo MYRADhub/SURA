@@ -9,7 +9,7 @@ def extract_yes_logprob(logprobs):
     if not logprobs:
         return float('-inf')
     for item in logprobs[0].top_logprobs:
-        if item.token.strip().lower() == "yes":
+        if item.token.strip() == "YES":
             return item.logprob
     return float('-inf')
 
