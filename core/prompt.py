@@ -761,7 +761,7 @@ Should Agent {agent_id} move **{direction}**?
 Now respond: YES or NO
 """
 
-def build_yesno_prompt_unassigned_goals(
+def build_yesno_prompt_unassigned_com(
     agent_id,
     agent_pos,
     goal_positions,
@@ -894,6 +894,7 @@ What goal should Agent {agent_id} pursue?
 6. **Output format** - respond with exactly one word: YES or NO. All caps. No punctuation or extra explanation.
 7. **Diagonal wall rule** - if two obstacles touch at corners, a thick black diagonal means you cannot pass through that diagonal.
 8. **Coordination via targets** - You are aware of other agents' chosen goals. If your selected target goal conflicts with theirs, consider whether **you** should change. Do not change without a reason — prefer to stay on your current goal unless a conflict clearly requires resolution.
+9. **Explanation** - Give a brief 1-2 sentence explanation of your reasoning for the move and goal choice in the explanation field.
 
 Now respond: YES or NO
 """

@@ -24,6 +24,7 @@ TASKS = [
     ("agent1_code", "agents.agent1_code"),
     ("agent_multi_yesno", "agents.agent_multi_yesno"),
     ("agent_yesno_unassigned", "agents.agent_yesno_unassigned"),
+    ("agent_com_unassigned", "agents.agent_com_unassigned"),
 ]
 
 def generate_random_obstacles(grid_size, num_obstacles=NUM_OBSTACLES, avoid=set()):
@@ -58,7 +59,7 @@ def evaluate_random(task_key, run_fn):
     with open(log_file, mode='a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         if write_header:
-            if task_key == "agent_multi_yesno":
+            if task_key == "agent_multi_yesno" or task_key == "agent_yesno_unassigned" or task_key == "agent_com_unassigned":
                 writer.writerow(["World", "Pair", "Trial", "Steps", "Optimal", "Failed", "Collisions"])
             else:
                 writer.writerow(["World", "Pair", "Trial", "Steps", "Optimal", "Failed"])
@@ -68,7 +69,7 @@ def evaluate_random(task_key, run_fn):
             dummy_positions = {(0, 0), (GRID_SIZE - 1, GRID_SIZE - 1)}
             obstacles = generate_random_obstacles(GRID_SIZE, avoid=dummy_positions)
 
-            if task_key == "agent_multi_yesno" or task_key == "agent_yesno_unassigned":
+            if task_key == "agent_multi_yesno" or task_key == "agent_yesno_unassigned" or task_key == "agent_com_unassigned":
                 # Multi-agent evaluation
                 for pair_idx in range(AGENT_GOAL_PAIRS_PER_WORLD):
                     for t in range(TRIALS_PER_CONFIG):

@@ -1,5 +1,5 @@
 from core.environment import GridWorld
-from core.prompt import build_yesno_prompt_unassigned_goals
+from core.prompt import build_yesno_prompt_unassigned_com
 from core.request import send_image_to_model_openai_logprobs_formatted
 from core.plot import plot_grid_unassigned
 from core.utils import shortest_path_length
@@ -70,7 +70,7 @@ def run(
                     for j in range(num_agents)
                     if j != i and agent_positions[j] is not None
                 ]
-                prompt = build_yesno_prompt_unassigned_goals(
+                prompt = build_yesno_prompt_unassigned_com(
                     agent_id=agent_ids[i],
                     agent_pos=agent_positions[i],
                     goal_positions=env.goals,
