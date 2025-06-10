@@ -123,6 +123,7 @@ def run(
 
         # Goal claiming logic
         to_remove = []
+        claimed_goals = []
         for i in range(num_agents):
             if not active[i] or agent_positions[i] is None:
                 continue
@@ -130,12 +131,17 @@ def run(
                 print(f"Agent {agent_ids[i]} reached a goal at {agent_positions[i]}")
                 active[i] = False
                 to_remove.append(i)
+                claimed_goals.append(agent_positions[i])
 
         for i in to_remove:
             agent_positions[i] = None
             env.agents[i] = None
-            env.goals[i] = None
-            target_goals[i] = None  # NEW: clear claimed goal from declared targets
+            target_goals[i] = None
+
+        for goal in claimed_goals:
+            if goal in env.goals:
+                env.goals[env.goals.index(goal)] = None
+
 
         print(f"Active agents: {[agent_ids[i] for i in range(num_agents) if active[i] and agent_positions[i] is not None]}")
         print(f"Remaining goals: {env.goals}")
@@ -147,6 +153,6 @@ def run(
     return step, total_opt, failed, collisions
 
 if __name__ == "__main__":
-    steps, optimal, failed, collisions = run()
+    steps, optimal, failed, collisions = run(grid_size=8, num_agents=2, agent_starts=[(4, 6), (7, 0)], goal_positions=[(0, 0), (2, 6)])
     print(f"\n✅ Task completed!")
     print(f"Optimal: {optimal}, Steps: {steps}, Failed: {failed}, Collisions: {collisions}")
