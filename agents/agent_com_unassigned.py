@@ -82,14 +82,10 @@ def run(
                     visits=visits[i],
                     agent_targets=target_goals  # NEW: passed to prompt
                 )
-                print(f"Agent {agent_ids[i]} prompt for direction {d}: {prompt}...")
                 time.sleep(0.5)
                 response_text, logprobs = send_image_to_model_openai_logprobs_formatted(image_path, prompt, temperature=0.0000001)
-                print(f"Agent {agent_ids[i]} response: {response_text[:150]}...")
-                # print(f"Logprobs: {logprobs}")
                 score = extract_yes_logprob(logprobs)
                 scores[d] = score
-                # print(f"Agent {agent_ids[i]} logprob for direction {d}: {score}")
 
                 if score > -5:  # If the model seems confident, record target
                     try:
@@ -102,6 +98,7 @@ def run(
             if scores:
                 best = max(scores, key=scores.get)
                 print(f"Agent {agent_ids[i]} chooses direction {best} with logprob {scores[best]}")
+                print(f"Agent {agent_ids[i]} current target goal: {target_goals[i]}")
                 proposals[i] = env.move_agent(agent_positions[i], best)
                 print(f"Agent {agent_ids[i]} moves from {agent_positions[i]} to {proposals[i]}")
                 memories[i].append((agent_positions[i][0], agent_positions[i][1], best, proposals[i][0], proposals[i][1]))
