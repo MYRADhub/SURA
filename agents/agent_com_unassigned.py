@@ -30,11 +30,11 @@ def extract_top_goals(logprobs):
     top2 = sorted(goal_scores.items(), key=lambda x: -x[1])[:2]
     return top2
 
-
 def run(
     obstacles={(2, 2), (3, 3), (4, 1)},
     grid_size=6,
     image_path="data/grid.png",
+    log_path="data/agent_step_logs.csv",
     max_steps=30,
     num_agents=3,
     agent_starts: list[tuple[int, int]] = None,
@@ -100,7 +100,7 @@ def run(
                     direction=d,
                     memory=memories[i],
                     visits=visits[i],
-                    agent_targets=target_goals  # NEW: passed to prompt
+                    agent_targets=target_goals
                 )
                 time.sleep(0.5)
                 response_text, logprobs = send_image_to_model_openai_logprobs_formatted(image_path, prompt, temperature=0.0000001)
@@ -202,7 +202,7 @@ def run(
     failed = step >= max_steps
     print(f"\nRun finished in {step} steps. Collisions: {collisions}. Failed: {failed}")
     if log_rows:
-        with open("data/agent_step_logs.csv", "w", newline="") as f:
+        with open(log_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=log_rows[0].keys())
             writer.writeheader()
             writer.writerows(log_rows)

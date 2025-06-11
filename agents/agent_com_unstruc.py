@@ -48,6 +48,7 @@ def run(
     obstacles={(2, 2), (3, 3), (4, 1)},
     grid_size=6,
     image_path="data/grid.png",
+    log_path="data/agent_step_logs.csv",
     max_steps=30,
     num_agents=3,
     agent_starts: list[tuple[int, int]] = None,
