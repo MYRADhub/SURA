@@ -39,6 +39,9 @@ def parse_json_response(text):
         return move, target, explanation
     except Exception as e:
         print(f"❌ Failed to parse JSON: {e}")
+        with open("fails.txt", "a") as f:
+            f.write(f"Failed to parse JSON: {e}\n")
+            f.write(f"Text: {text}\n\n")
         return None, None, ""
 
 def run(
