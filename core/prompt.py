@@ -898,3 +898,147 @@ What goal should Agent {agent_id} pursue?
 
 Now respond: YES or NO
 """
+
+def build_yesno_prompt_unassigned_com_unstructured(
+    agent_id,
+    agent_pos,
+    goal_positions,
+    other_agents,  # list of tuples (other_agent_id, position)
+    grid_size,
+    obstacles,
+    direction,
+    memory,   # list of (r0, c0, dir, r1, c1)
+    visits,   # dict {(r, c): count}
+    agent_targets  # list of target goal labels (e.g., ["A", "B", None])
+):
+    # Format obstacle coordinates
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    # Format memory
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → got to (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Format move analysis
+    move_analysis_lines = []
+    for d in ['up', 'down', 'left', 'right']:
+        r, c = agent_pos
+        if d == "up":
+            target = (r + 1, c)
+        elif d == "down":
+            target = (r - 1, c)
+        elif d == "left":
+            target = (r, c - 1)
+        elif d == "right":
+            target = (r, c + 1)
+        else:
+            continue
+        count = visits.get(target, 0)
+        move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+    move_analysis = "\n".join(move_analysis_lines)
+
+    # Format other agents
+    if other_agents:
+        other_agent_lines = "\n".join(
+            [f"  • Agent {aid} is at (row {pos[0]}, col {pos[1]})" for aid, pos in other_agents]
+        )
+    else:
+        other_agent_lines = "  • (no other agents present)"
+
+    # Format declared targets
+    declared_target_lines = []
+    for idx, (aid, tgt) in enumerate(zip(range(1, len(agent_targets) + 1), agent_targets)):
+        if aid == agent_id:
+            continue  # don't include self
+        if tgt is not None and other_agents and any(oaid == aid for oaid, _ in other_agents):
+            declared_target_lines.append(f"  • Agent {aid} → Goal {tgt}")
+    if declared_target_lines:
+        declared_targets_block = "\n".join(declared_target_lines)
+    else:
+        declared_targets_block = "  • (no goal commitments from other agents)"
+
+    # Format goals (unassigned)
+    goal_lines = "\n".join(
+        [f"  • Goal {chr(65+i)} is at (row {pos[0]}, col {pos[1]})" for i, pos in enumerate(goal_positions) if pos is not None]
+    )
+
+    # Dynamically list only the existing goal labels in the environment description
+    existing_goal_labels = [chr(65+i) for i, pos in enumerate(goal_positions) if pos is not None]
+    if existing_goal_labels:
+        goal_label_str = ", ".join([f"**{label}**" for label in existing_goal_labels])
+    else:
+        goal_label_str = "(none)"
+
+    return f"""
+**Environment**
+
+You are Agent {agent_id} (a blue square labeled **{agent_id}**) on a {grid_size}×{grid_size} grid.  
+There are several red squares labeled {goal_label_str}. These are **unassigned goals** — you may approach any of them.  
+Black squares are obstacles that **cannot be entered**.  
+Other agents may be present — they are also shown as blue squares with numeric labels (1, 2, 3, ...).
+
+Four colored borders define direction:
+* green (top) → **up**
+* gray (bottom) → **down**
+* yellow (left) → **left**
+* blue (right) → **right**
+
+All coordinates are zero-indexed:
+- (0, 0) is the bottom-left corner
+- ({grid_size - 1}, {grid_size - 1}) is the top-right corner
+
+In the image:
+- Obstacles are black squares labeled **O**
+- Goals are red squares labeled {goal_label_str}
+- You are labeled **{agent_id}**
+- Other agents are labeled numerically
+
+**Current state**  
+* Your position        … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* Obstacles            … {obs_coords or "none"}  
+* Other agents         …  
+{other_agent_lines}
+* Declared targets     …  
+{declared_targets_block}
+* Goal locations       …  
+{goal_lines}
+
+**Memory (last 5 moves)**  
+{history_lines}
+
+**Move Analysis (cell visit frequency)**  
+{move_analysis}
+
+---
+
+### Question
+
+Should Agent {agent_id} move **{direction}**?
+What goal should Agent {agent_id} pursue?
+
+---
+
+### Instructions (read carefully before responding)
+
+1. **Legal actions** - do not walk into obstacles or off the grid.
+2. **Goal coverage** - each goal must be reached by one agent, but **goals are unassigned**.
+3. **Coordination assumption** - you cannot communicate with other agents. Avoid chasing the same goal as others if better options exist.
+4. **Global objective** - minimize the **total number of steps** for all agents to reach all goals.
+5. **Don't be greedy** - choosing the nearest goal isn't always optimal for the team.
+6. **Output format** - respond with exactly one word: YES or NO. All caps. No punctuation or extra explanation.
+7. **Diagonal wall rule** - if two obstacles touch at corners, a thick black diagonal means you cannot pass through that diagonal.
+8. **Coordination via targets** - You are aware of other agents' chosen goals. If your selected target goal conflicts with theirs, consider whether **you** should change. Do not change without a reason — prefer to stay on your current goal unless a conflict clearly requires resolution.
+9. **Explanation** - Give a brief 1-2 sentence explanation of your reasoning for the move and goal choice in the explanation field.
+10. **Response structure** - Provide your answer in a JSON format with keys "move", "target", and "explanation". However, do not include the json wrapper with the triple quotes in your response, just the JSON object itself in plain text format. DO NOT WRITE THE TRIPLE QUOTES JSON.
+
+Respond in the JSON format:
+{{
+  "move": "YES or NO in CAPS",
+  "target": "(goal letter, e.g. A, B, ... in CAPS)",
+  "explanation": "(brief justification for your choice, 1-2 sentences)"
+}}
+"""

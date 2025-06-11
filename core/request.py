@@ -144,7 +144,6 @@ def send_image_to_model_openai_logprobs(image_path, prompt, temperature=None):
     choices = response.choices
     logprobs = choices[0].logprobs.content
     sentence = choices[0].message.content
-    sentence = sentence.lower()
     
     return sentence, logprobs
 
