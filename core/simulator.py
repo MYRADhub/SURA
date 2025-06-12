@@ -16,19 +16,8 @@ def simulate_from_log(
     df["position_before"] = df["position_before"].apply(ast.literal_eval)
     df["position_after"] = df["position_after"].apply(ast.literal_eval)
 
-    # Get initial agent positions and goal declarations
-    first_step = df[df["step"] == 0]
-    agent_ids = sorted(first_step["agent_id"].unique())
-    num_agents = len(agent_ids)
-
-    # Deduce goal declarations per agent from first non-empty target_goal
-    goal_declarations = [None] * num_agents
-    for i, aid in enumerate(agent_ids):
-        agent_rows = df[df["agent_id"] == aid]
-        for g in agent_rows["target_goal"]:
-            if pd.notna(g) and isinstance(g, str) and g.strip() != "":
-                goal_declarations[i] = g.strip().upper()
-                break
+    # Get agent IDs from the DataFrame
+    agent_ids = sorted(df["agent_id"].unique())
 
     # Initialize the environment
     env = GridWorld(size=grid_size, obstacles=obstacles)
@@ -42,6 +31,12 @@ def simulate_from_log(
     print(f"Initial agent positions: {agent_positions}")
     print(f"Goal positions: {goal_positions}")
     print(f"Obstacles: {obstacles}")
+
+    # Render initial state before any moves
+    plot_grid_unassigned(env, image_path=image_path)
+    print(f"🖼️  Initial grid rendered to: {image_path}")
+    input("🔁 Press [ENTER] to start simulation...")
+
     print(f"Press ENTER to advance each step...")
 
     for step, rows in grouped:
@@ -77,7 +72,7 @@ def simulate_from_log(
     print("\n✅ Simulation complete.")
 
 if __name__ == "__main__":
-    csv_path = "data/agent_step_logs.csv"
-    initial_positions = [(0, 0), (0, 1), (0, 2)]
-    goal_positions = [(7, 7), (7, 6), (7, 5)]
-    simulate_from_log(csv_path, initial_positions, goal_positions)
+    csv_path = "results_team/agent_com_unstruc_case_1_local_greed_trial1_log.csv"
+    initial_positions = [(3, 1), (3, 5)]
+    goal_positions = [(1, 4), (0, 6)]
+    simulate_from_log(csv_path, initial_positions, goal_positions, obstacles={(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)})
