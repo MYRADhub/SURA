@@ -181,11 +181,118 @@ def plot_grid_unassigned(env: GridWorld, image_path="data/grid.png"):
     plt.savefig(image_path, bbox_inches='tight')
     plt.close()
 
+def plot_grid_unassigned_labeled(env: GridWorld, image_path="data/grid_labeled.png"):
+    grid = np.ones((env.size, env.size, 3))
 
-# Test usage
+    # Draw obstacles (black)
+    for pos in env.obstacles:
+        grid[pos] = [0.0, 0.0, 0.0]
+
+    # Draw goals (red)
+    goal_color = [1.0, 0.0, 0.0]
+    for goal in env.goals:
+        if goal is not None:
+            grid[goal] = goal_color
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.imshow(grid, extent=[0, env.size, 0, env.size], origin='lower')
+    # Skip coloring the grid directly for agents
+    agent_color = [0.0, 0.4, 1.0]
+    for idx, agent in enumerate(env.agents):
+        if agent is not None:
+            r, c = agent
+            circle = plt.Circle(
+                (c + 0.5, r + 0.5), 0.45,  # position and radius
+                color=agent_color,
+                zorder=3  # above grid
+            )
+            ax.add_patch(circle)
+
+    # Grid lines
+    for x in range(env.size + 1):
+        ax.axhline(x, color='gray', linewidth=0.5)
+        ax.axvline(x, color='gray', linewidth=0.5)
+
+    # Axis ticks
+    ax.set_xticks(np.arange(env.size) + 0.5)
+    ax.set_yticks(np.arange(env.size) + 0.5)
+    ax.set_xticklabels([f"col {i}" for i in range(env.size)])
+    ax.set_yticklabels([f"row {i}" for i in range(env.size)])
+    ax.tick_params(axis='both', which='both', length=0)
+
+    # Count total number of cells to determine label width
+    total_cells = env.size * env.size
+    label_width = len(str(total_cells - 1))
+
+    # Assign global sequential cell IDs
+    cell_id = 0
+    for r in range(env.size):
+        for c in range(env.size):
+            actual_row = r
+            actual_col = c
+            label = ""
+            pos = (actual_row, actual_col)
+            if pos in env.obstacles:
+                label = "O"
+            elif any(pos == agent_pos for agent_pos in env.agents if agent_pos is not None):
+                idx = next(i for i, a in enumerate(env.agents) if a == pos)
+                label = f"{idx + 1}"  # Agent label
+            elif any(pos == goal_pos for goal_pos in env.goals if goal_pos is not None):
+                idx = next(i for i, g in enumerate(env.goals) if g == pos)
+                label = chr(65 + idx)  # Goal label
+
+            # Draw labels for agents/goals/obstacles
+            if label:
+                ax.text(
+                    actual_col + 0.5, actual_row + 0.5, label,
+                    color="white",
+                    fontsize=12,
+                    ha='center',
+                    va='center',
+                    weight='bold'
+                )
+            else:
+                # Empty cell → show gray ID
+                id_str = str(cell_id).zfill(label_width)
+                ax.text(
+                    actual_col + 0.5, actual_row + 0.5, id_str,
+                    color="gray",
+                    fontsize=8,
+                    ha='center',
+                    va='center',
+                    alpha=0.6
+                )
+            cell_id += 1  # Always increment cell ID, even if it's an obstacle
+
+    # Border directions
+    margin = 0.5
+    ax.axvline(env.size + margin, color='blue', linewidth=16)    # Right
+    ax.axvline(0 - margin, color='yellow', linewidth=16)         # Left
+    ax.axhline(env.size + margin, color='green', linewidth=16)   # Top
+    ax.axhline(0 - margin, color='orange', linewidth=16)         # Bottom
+
+    # Diagonal blockers
+    for r in range(env.size - 1):
+        for c in range(env.size - 1):
+            tl = (r + 1, c)
+            tr = (r + 1, c + 1)
+            bl = (r, c)
+            br = (r, c + 1)
+            if tl in env.obstacles and br in env.obstacles and tr not in env.obstacles and bl not in env.obstacles:
+                ax.plot([c + 0.5, c + 1.5], [r + 1.5, r + 0.5], color='black', linewidth=10, solid_capstyle='round')
+            elif tr in env.obstacles and bl in env.obstacles and tl not in env.obstacles and br not in env.obstacles:
+                ax.plot([c + 1.5, c + 0.5], [r + 1.5, r + 0.5], color='black', linewidth=10, solid_capstyle='round')
+
+    ax.set_xlim([-margin, env.size + margin])
+    ax.set_ylim([-margin, env.size + margin])
+    plt.axis('off')
+    plt.savefig(image_path, bbox_inches='tight')
+    plt.close()
+
 if __name__ == "__main__":
     env = GridWorld(size=8, obstacles={(2, 2), (3, 3), (5, 5)})
     env.initialize_agents_goals(num_agents=4)
     plot_grid(env)
     plot_grid_unassigned(env, image_path="data/grid_unassigned.png")
+    plot_grid_unassigned_labeled(env, image_path="data/grid_unassigned_labeled.png")
     print("Grid with arbitrary agents and obstacles saved.")
