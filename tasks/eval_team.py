@@ -17,6 +17,7 @@ TRIALS_PER_CASE = 2
 TASKS = [
     ("agent_yesno_unassigned", "agents.agent_yesno_unassigned"),
     ("agent_com_unassigned", "agents.agent_com_unassigned"),
+    ("agent_com_unstruc", "agents.agent_com_unstruc")
 ]
 
 # Shared obstacle layout (no overlaps)
@@ -82,9 +83,12 @@ def evaluate_team(task_key, run_fn):
                 if VISUALIZE:
                     plot_grid_unassigned(env, image_path=f"data/{task_key}_{case_name}_t{trial+1}.png")
 
+                case_log_path = os.path.join(OUTPUT_DIR, f"{task_key}_{case_name}_trial{trial+1}_log.csv")
+
                 steps, optimal, failed, collisions = run_fn(
                     grid_size=GRID_SIZE,
                     obstacles=obstacles,
+                    log_path=case_log_path,
                     agent_starts=cfg["agents"],
                     goal_positions=cfg["goals"],
                     image_path=IMAGE_PATH,

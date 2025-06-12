@@ -1,6 +1,6 @@
 import time
 import json
-import re
+import csv
 from core.environment import GridWorld
 from core.prompt import build_yesno_prompt_unassigned_com_unstructured
 from core.request import send_image_to_model_openai_logprobs
@@ -19,13 +19,22 @@ def extract_yes_logprob(logprobs):
     # print(logprobs)
 
     for token_info in logprobs:
-        token_str = token_info.token.strip().upper()
+        token_str = token_info.token.strip()
         if token_str in {"YES", "NO"}:
             for top in token_info.top_logprobs:
-                if top.token.strip().upper() == "YES":
+                if top.token.strip() == "YES":
                     return top.logprob
     return float("-inf")
 
+def extract_top_goals(logprobs):
+    goal_scores = {}
+    for entry in logprobs:
+        for tok in entry.top_logprobs:
+            t = tok.token.strip()
+            if t in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                goal_scores[t] = max(goal_scores.get(t, float('-inf')), tok.logprob)
+    top2 = sorted(goal_scores.items(), key=lambda x: -x[1])[:2]
+    return top2
 
 def parse_json_response(text):
     """Safely parse a JSON blob from response text."""
@@ -38,7 +47,7 @@ def parse_json_response(text):
         explanation = parsed.get("explanation", "").strip()
         return move, target, explanation
     except Exception as e:
-        print(f"❌ Failed to parse JSON: {e}")
+        print(f"Failed to parse JSON: {e}")
         with open("fails.txt", "a") as f:
             f.write(f"Failed to parse JSON: {e}\n")
             f.write(f"Text: {text}\n\n")
@@ -68,6 +77,7 @@ def run(
     target_goals = [None for _ in range(num_agents)]
     step = 0
     collisions = 0
+    log_rows = []
 
     total_opt = sum(
         min([shortest_path_length(start, g, env) for g in env.goals if g is not None], default=0)
@@ -92,6 +102,8 @@ def run(
             valid = env.get_valid_actions(agent_positions[i])
             print(f"Valid moves for Agent {agent_ids[i]}: {valid}")
             scores = {}
+            dir_logprobs = {}   # direction -> logprobs
+            dir_targets = {}    # direction -> (target, explanation)
 
             for d in valid:
                 other_infos = [
@@ -113,26 +125,42 @@ def run(
                 )
                 time.sleep(0.5)
                 response_text, logprobs = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
-                # print(f"Agent {agent_ids[i]} response: {response_text}")
+
                 score = extract_yes_logprob(logprobs)
-                if score == float('-inf'):
-                    print(f"Agent {agent_ids[i]} received no valid logprob for direction {d}")
-                else:
-                    print(f"Agent {agent_ids[i]} logprob for direction {d}: {score}")
                 scores[d] = score
+                dir_logprobs[d] = logprobs
 
                 move, target, explanation = parse_json_response(response_text)
+                dir_targets[d] = (target, explanation)
+
                 if target:
                     target_goals[i] = target
                     print(f"Agent {agent_ids[i]} declares target: {target}")
                 if explanation:
                     print(f"Explanation: {explanation}")
 
+
             if scores:
                 best = max(scores, key=scores.get)
                 print(f"Agent {agent_ids[i]} chooses direction {best} with logprob {scores[best]}")
                 print(f"Agent {agent_ids[i]} current target goal: {target_goals[i]}")
                 proposals[i] = env.move_agent(agent_positions[i], best)
+                top_goals = extract_top_goals(dir_logprobs[best])
+                target, explanation = dir_targets[best]
+                log_rows.append({
+                    "step": step,
+                    "agent_id": agent_ids[i],
+                    "position_before": agent_positions[i],
+                    "position_after": proposals[i],
+                    "chosen_direction": best,
+                    "logprob_yes": f"{scores[best]:.5f}",
+                    "target_goal": target,
+                    "goal_top1": top_goals[0][0] if len(top_goals) > 0 else "",
+                    "goal_top1_logprob": f"{top_goals[0][1]:.5f}" if len(top_goals) > 0 else "",
+                    "goal_top2": top_goals[1][0] if len(top_goals) > 1 else "",
+                    "goal_top2_logprob": f"{top_goals[1][1]:.5f}" if len(top_goals) > 1 else "",
+                    "explanation": explanation,
+                })
                 print(f"Agent {agent_ids[i]} moves from {agent_positions[i]} to {proposals[i]}")
                 memories[i].append((agent_positions[i][0], agent_positions[i][1], best, proposals[i][0], proposals[i][1]))
                 if len(memories[i]) > 5:
@@ -180,6 +208,11 @@ def run(
 
     failed = step >= max_steps
     print(f"\nRun finished in {step} steps. Collisions: {collisions}. Failed: {failed}")
+    if log_rows:
+        with open(log_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=log_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(log_rows)
     return step, total_opt, failed, collisions
 
 if __name__ == "__main__":
