@@ -2,42 +2,29 @@ import pandas as pd
 import ast
 from core.environment import GridWorld
 from core.plot import plot_grid_unassigned
+import argparse
 
-def simulate_from_log(
-    csv_path,
-    initial_positions,
-    goal_positions,
-    grid_size=8,
-    obstacles={(2, 2), (3, 3), (4, 1)},
-    image_path="data/sim.png"
-):
+def simulate_from_log(csv_path, config_path, image_path="data/sim.png"):
+    # Load config-based environment
+    env = GridWorld(config_path)
+
     # Load and preprocess the CSV
     df = pd.read_csv(csv_path)
     df["position_before"] = df["position_before"].apply(ast.literal_eval)
     df["position_after"] = df["position_after"].apply(ast.literal_eval)
 
-    # Get agent IDs from the DataFrame
     agent_ids = sorted(df["agent_id"].unique())
-
-    # Initialize the environment
-    env = GridWorld(size=grid_size, obstacles=obstacles)
-    env.initialize_agents_goals_custom(agents=initial_positions, goals=goal_positions)
-
-    # Group by step
     grouped = df.groupby("step")
-    agent_positions = initial_positions[:]
+    agent_positions = env.agents[:]
 
     print(f"🧭 Simulation start: {len(grouped)} steps")
-    print(f"Initial agent positions: {agent_positions}")
-    print(f"Goal positions: {goal_positions}")
-    print(f"Obstacles: {obstacles}")
+    print(f"Initial agent positions: {env.agents}")
+    print(f"Goal positions: {env.goals}")
+    print(f"Obstacles: {env.obstacles}")
 
-    # Render initial state before any moves
     plot_grid_unassigned(env, image_path=image_path)
     print(f"🖼️  Initial grid rendered to: {image_path}")
     input("🔁 Press [ENTER] to start simulation...")
-
-    print(f"Press ENTER to advance each step...")
 
     for step, rows in grouped:
         print(f"\n📦 STEP {step}")
@@ -63,7 +50,6 @@ def simulate_from_log(
 
             agent_positions[idx] = after
 
-        # Update and render environment
         env.agents = agent_positions[:]
         plot_grid_unassigned(env, image_path=image_path)
         print(f"🖼️  Grid rendered to: {image_path}")
@@ -72,8 +58,11 @@ def simulate_from_log(
     print("\n✅ Simulation complete.")
 
 if __name__ == "__main__":
-    csv_path = "data/agent_step_logs.csv"
-    agent_starts=[(2, 0), (2, 3)]
-    goal_positions=[(1, 4), (7, 7)]
-    obstacles={(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)}
-    simulate_from_log(csv_path, agent_starts, goal_positions, obstacles=obstacles)
+    parser = argparse.ArgumentParser(description="Simulate agent movements from a log CSV file.")
+    parser.add_argument("csv_path", help="Path to the CSV log file")
+    parser.add_argument("config_path", help="Path to the environment config file")
+    parser.add_argument("--image_path", default="data/sim.png", help="Path to save rendered grid images (default: data/sim.png)")
+
+    args = parser.parse_args()
+
+    simulate_from_log(args.csv_path, args.config_path, args.image_path)
