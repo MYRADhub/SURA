@@ -1,4 +1,3 @@
-from core.utils import shortest_path_length
 
 def build_prompt_single(agent_pos, target_pos, valid_actions, grid_size):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
@@ -1120,19 +1119,6 @@ def build_yesno_prompt_unstruc_v2(
     else:
         goal_label_str = "(none)"
 
-    # Compute distance lines
-    distance_lines = []
-    for i, goal in enumerate(goal_positions):
-        if goal:
-            dist = shortest_path_length(agent_pos, goal, env)
-            distance_lines.append(f"* You are {dist} steps from Goal {chr(65 + i)}.")
-    for aid, apos in other_agents:
-        for i, goal in enumerate(goal_positions):
-            if goal:
-                dist = shortest_path_length(apos, goal, env)
-                distance_lines.append(f"* Agent {aid} is {dist} steps from Goal {chr(65 + i)}.")
-    distance_block = "\n".join(distance_lines)
-
     # Calculate projected cell number if the agent moves in the proposed direction
     move_offsets = {
         'up': (1, 0),
@@ -1205,7 +1191,7 @@ A simulation step means that all agents move once at the same time. The simulati
 
     If you take Goal B and Agent 2 takes Goal A, the simulation ends in 6 steps.
 
-    So you should take Goal A — not because it’s closer, but because this choice leads to the shortest total simulation.
+    So you should take Goal A — not because it's closer, but because this choice leads to the shortest total simulation.
 
 Your reasoning and goal selection should be based on this principle.
 
@@ -1218,9 +1204,6 @@ Your reasoning and goal selection should be based on this principle.
 {declared_targets_block}
 * Goal locations       …  
 {goal_lines}
-
-**Distances to goals**  
-{distance_block}
 
 **Memory (last 5 moves)**  
 {history_lines}
@@ -1276,3 +1259,264 @@ Respond in the JSON format:
 }}
 """
 
+def build_target_selection_prompt(
+    agent_id,
+    agent_pos,
+    goal_positions,
+    other_agents,
+    grid_size,
+    obstacles,
+    memory,
+    visits,
+    agent_targets,
+):
+    # Format obstacle coordinates
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    # Memory (movement history)
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Goal locations
+    goal_lines = "\n".join(
+        [f"  • Goal {chr(65+i)} is at (row {r}, col {c})" for i, (r, c) in enumerate(goal_positions) if (r, c)]
+    )
+
+    # Other agents' positions
+    if other_agents:
+        other_agent_lines = "\n".join(
+            [f"  • Agent {aid} is at (row {pos[0]}, col {pos[1]})" for aid, pos in other_agents]
+        )
+    else:
+        other_agent_lines = "  • (no other agents present)"
+
+    # Other agents' declared goals
+    declared_target_lines = []
+    for idx, (aid, tgt) in enumerate(zip(range(1, len(agent_targets)+1), agent_targets)):
+        if aid == agent_id:
+            continue
+        if tgt is not None and any(oaid == aid for oaid, _ in other_agents):
+            declared_target_lines.append(f"  • Agent {aid} → Goal {tgt}")
+    declared_targets_block = "\n".join(declared_target_lines) if declared_target_lines else "  • (no goal commitments from other agents)"
+
+    return f"""
+**Environment**
+
+You are Agent {agent_id} (a blue circle labeled **{agent_id}**) on a {grid_size}×{grid_size} grid.  
+Your job is to choose which goal you will pursue next.  
+There are red squares labeled A, B, C, etc. that represent **unassigned goals** — any agent may choose to pursue any of them.  
+Other agents may also be present on the grid, and they may already be targeting some goals.  
+Black squares are obstacles that cannot be entered.  
+Empty cells are labeled with gray numbers to help you reason spatially.  
+The cell numbers increase **left to right**, then **bottom to top**, like reading lines of text.
+
+All coordinates are zero-indexed:  
+- (0, 0) is the **bottom-left corner**  
+- ({grid_size - 1}, {grid_size - 1}) is the **top-right corner**
+
+**Simulation mechanics:**
+
+- The simulation runs in **timesteps**.  
+- **At each timestep, every agent moves once.**  
+- The simulation ends when **all agents have reached their goals**.
+- The total number of steps is defined as the **number of timesteps it takes for the last agent to finish**.
+
+> ✅ This means your goal is to **minimize the number of total simulation steps**, not your personal path length.
+
+---
+
+### 🧠 Key Concepts
+
+• If one agent takes 3 steps and another takes 7 steps, the **total cost is 7** — because that's when the last goal is reached.
+
+• If you choose the closest goal selfishly, another agent might be forced to take a longer path to a farther goal, increasing the total simulation time.
+
+• Sometimes it's better for you to choose a **farther goal**, so another agent can take a **closer** one.
+
+• This way, **everyone finishes earlier**, and the team achieves the goal faster.
+
+---
+
+### ✅ Example
+
+- You are 3 steps from Goal A and 6 steps from Goal B.  
+- Agent 2 is 6 steps from Goal A and 4 steps from Goal B.  
+
+→ If **you** take Goal A and Agent 2 takes Goal B, total time = 4 steps.  
+→ If **you** take Goal B and Agent 2 takes Goal A, total time = 6 steps.  
+
+✅ You should take **Goal A** to minimize the total time — even though it’s closer to you.
+
+---
+
+**Current state**  
+* Your position        … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* Obstacles            … {obs_coords or "none"}  
+* Other agents         …  
+{other_agent_lines}
+* Declared targets     …  
+{declared_targets_block}
+* Goal locations       …  
+{goal_lines}
+
+**Memory (last 5 moves)**  
+{history_lines}
+
+---
+
+### Question
+
+Which goal should Agent {agent_id} pursue?  
+Choose one of the red-labeled goal letters (A, B, C, ...).
+
+---
+
+### Instructions
+
+1. Each goal must be reached by exactly one agent — no duplication.
+2. Do **not** choose based only on your own path. Consider the **team**.
+3. Try to minimize the total number of timesteps for **everyone**.
+4. Avoid taking a goal if another agent is clearly closer — unless doing so helps the team finish faster.
+5. Use spatial reasoning based on positions, not just distance.
+6. Respond only in the following format:
+
+Respond in the JSON format:
+```json
+{{
+  "target": "(goal letter, e.g. A, B, ... in CAPS)",
+  "explanation": "(brief justification for your choice, 1-2 sentences)"
+}}
+```
+"""
+
+def build_direction_selection_prompt(
+    agent_id,
+    agent_pos,
+    declared_goal,  # e.g., "B"
+    goal_positions,  # list of (r, c)
+    other_agents,  # list of (id, (r, c))
+    grid_size,
+    obstacles,
+    direction,  # proposed direction
+    memory,
+    visits,
+    agent_targets  # list of goal letters for all agents
+):
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    # Move history
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Move analysis
+    move_analysis_lines = []
+    for d in ['up', 'down', 'left', 'right']:
+        r, c = agent_pos
+        if d == "up":
+            target = (r + 1, c)
+        elif d == "down":
+            target = (r - 1, c)
+        elif d == "left":
+            target = (r, c - 1)
+        elif d == "right":
+            target = (r, c + 1)
+        else:
+            continue
+        count = visits.get(target, 0)
+        move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+    move_analysis = "\n".join(move_analysis_lines)
+
+    # Calculate projected cell number
+    move_offsets = {
+        'up': (1, 0),
+        'down': (-1, 0),
+        'left': (0, -1),
+        'right': (0, 1)
+    }
+    move_label_line = ""
+    if direction in move_offsets:
+        r, c = agent_pos
+        dr, dc = move_offsets[direction]
+        target_pos = (r + dr, c + dc)
+        if 0 <= target_pos[0] < grid_size and 0 <= target_pos[1] < grid_size:
+            cell_id = target_pos[0] * grid_size + target_pos[1]
+            move_label_line = f"If you move **{direction}**, you will arrive at cell **{cell_id}**."
+        else:
+            move_label_line = f"If you move **{direction}**, you would go out of bounds."
+
+    # Declared goal location
+    goal_index = ord(declared_goal.upper()) - 65
+    goal_pos = goal_positions[goal_index] if 0 <= goal_index < len(goal_positions) else None
+    goal_line = f"* Your current target goal is **Goal {declared_goal}**, located at (row {goal_pos[0]}, col {goal_pos[1]})." if goal_pos else "* You have a declared goal, but its location is not known."
+
+    # Declared targets of others
+    declared_targets_block = []
+    for aid, tgt in zip(range(1, len(agent_targets)+1), agent_targets):
+        if aid == agent_id:
+            continue
+        if tgt is not None and any(oaid == aid for oaid, _ in other_agents):
+            declared_targets_block.append(f"  • Agent {aid} → Goal {tgt}")
+    declared_block = "\n".join(declared_targets_block) if declared_targets_block else "  • (no goal commitments from other agents)"
+
+    return f"""
+**Environment**
+
+You are Agent {agent_id} (a blue circle labeled **{agent_id}**) on a {grid_size}×{grid_size} grid.  
+Your current declared target is Goal {declared_goal}.  
+Your job now is to decide whether you should move **{direction}** to approach it.  
+
+Other agents are also choosing their moves. Coordination is important — do not walk into obstacles or other agents.  
+
+All empty cells are labeled with a gray number for orientation.  
+Cell numbers increase left to right, then row by row from bottom to top.  
+
+**Current state**  
+* Your position        … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* {goal_line}  
+* Obstacles            … {obs_coords or "none"}  
+* Other agents         …  
+{chr(10).join([f"  • Agent {aid} is at (row {r}, col {c})" for aid, (r, c) in other_agents]) or "  • (none)"}  
+* Declared targets     …  
+{declared_block}
+
+**Memory (last 5 moves)**  
+{history_lines}
+
+**Move Analysis (visit frequency)**  
+{move_analysis}
+
+---
+
+### Question
+
+Should Agent {agent_id} move **{direction}**?  
+{move_label_line}
+
+---
+
+### Instructions
+
+1. Only respond YES if the move brings you closer to your goal and avoids danger.
+2. DO NOT move into obstacles or off the grid.
+3. If another agent is nearby or heading to the same area, consider avoiding a collision.
+4. Use your declared goal to reason about where to go — you are committed to it unless a new plan is made.
+5. Do not block others if there’s a better route for the team.
+
+Respond in the JSON format:
+```json
+{{
+  "move": "YES or NO in CAPS",
+  "explanation": "(brief justification for your choice, 1-2 sentences)"
+}}
+```
+"""
