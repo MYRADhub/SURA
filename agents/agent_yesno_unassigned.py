@@ -14,19 +14,26 @@ def extract_yes_logprob(logprobs):
     return float('-inf')
 
 def run(
+    image_path="data/grid.png",
+    log_path="data/agent_step_logs.csv",
+    max_steps=30,
+    config_path=None,
     obstacles={(2, 2), (3, 3), (4, 1)},
     grid_size=6,
-    image_path="data/grid.png",
-    max_steps=30,
     num_agents=3,
     agent_starts: list[tuple[int, int]] = None,
     goal_positions: list[tuple[int, int]] = None
 ):
-    env = GridWorld(grid_size, obstacles=obstacles)
-    if agent_starts and goal_positions:
-        env.initialize_agents_goals_custom(agents=agent_starts, goals=goal_positions)
+    if config_path:
+        env = GridWorld(config_path)
+        grid_size = env.size
+        num_agents = len(env.agents)
     else:
-        env.initialize_agents_goals(num_agents=num_agents)
+        env = GridWorld(grid_size, obstacles=obstacles)
+        if agent_starts and goal_positions:
+            env.initialize_agents_goals_custom(agents=agent_starts, goals=goal_positions)
+        else:
+            env.initialize_agents_goals(num_agents=num_agents)
 
     agent_positions = env.agents[:]
     agent_ids = list(range(1, num_agents + 1))

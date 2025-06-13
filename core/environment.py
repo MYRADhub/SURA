@@ -1,13 +1,32 @@
 import random
+import yaml
 
 class GridWorld:
-    def __init__(self, size, obstacles=None):
-        self.size = size
-        self.obstacles = set(obstacles or [])
+    def __init__(self, size_or_config, obstacles=None):
+        if isinstance(size_or_config, str):
+            # Assume it's a path to a YAML config file
+            self._load_from_config(size_or_config)
+        else:
+            # Manual size + optional obstacles mode
+            self.size = size_or_config
+            self.obstacles = set(obstacles or [])
+            self.agents = []
+            self.goals = []
 
-        # Init empty agents and goals
-        self.agents = []   # List of (row, col)
-        self.goals = []    # List of (row, col)
+    def _load_from_config(self, path):
+        try:
+            with open(path, "r") as f:
+                cfg = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML format in config file: {e}")
+
+        if not isinstance(cfg, dict) or "size" not in cfg:
+            raise ValueError("Config file missing required 'size' field or is not a valid dictionary.")
+
+        self.size = cfg["size"]
+        self.obstacles = {tuple(pos) for pos in cfg.get("obstacles", [])}
+        self.agents = [tuple(pos) for pos in cfg.get("agents", [])]
+        self.goals = [tuple(pos) for pos in cfg.get("goals", [])]
 
     def is_valid(self, pos):
         row, col = pos
