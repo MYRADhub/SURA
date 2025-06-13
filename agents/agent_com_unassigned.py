@@ -209,6 +209,10 @@ def run(
     return step, total_opt, failed, collisions
 
 if __name__ == "__main__":
-    steps, optimal, failed, collisions = run(grid_size=8, num_agents=2, agent_starts=[(3, 1), (3, 5)], goal_positions=[(1, 4), (1, 2)], obstacles = {(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)}, log_path="results_team/agent_com_unassigned_case_9_closer_to_wrong_agent_trial1_log.csv", )
+    steps, optimal, failed, collisions = run(grid_size=8,
+        num_agents=2,
+        agent_starts=[(2, 0), (2, 3)],
+        goal_positions=[(1, 4), (7, 7)],
+        obstacles={(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)})
     print(f"\n✅ Task completed!")
     print(f"Optimal: {optimal}, Steps: {steps}, Failed: {failed}, Collisions: {collisions}")

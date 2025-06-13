@@ -1,3 +1,5 @@
+from core.utils import shortest_path_length
+
 def build_prompt_single(agent_pos, target_pos, valid_actions, grid_size):
     action_list = ', '.join([f"**{a}**" for a in valid_actions])
     return f"""
@@ -1042,3 +1044,235 @@ Respond in the JSON format:
   "explanation": "(brief justification for your choice, 1-2 sentences)"
 }}
 """
+
+def build_yesno_prompt_unstruc_v2(
+    agent_id,
+    agent_pos,
+    goal_positions,
+    other_agents,  # list of tuples (other_agent_id, position)
+    grid_size,
+    obstacles,
+    direction,
+    memory,   # list of (r0, c0, dir, r1, c1)
+    visits,   # dict {(r, c): count}
+    agent_targets,  # list of target goal labels (e.g., ["A", "B", None])
+    env  # full GridWorld environment instance (required for pathfinding)
+):
+    # Format obstacle coordinates
+    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+
+    # Format memory
+    if memory:
+        history_lines = "\n".join(
+            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → got to (row {r1}, col {c1})"
+             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+        )
+    else:
+        history_lines = "  • (no prior moves — this is the first step)"
+
+    # Format move analysis
+    move_analysis_lines = []
+    for d in ['up', 'down', 'left', 'right']:
+        r, c = agent_pos
+        if d == "up":
+            target = (r + 1, c)
+        elif d == "down":
+            target = (r - 1, c)
+        elif d == "left":
+            target = (r, c - 1)
+        elif d == "right":
+            target = (r, c + 1)
+        else:
+            continue
+        count = visits.get(target, 0)
+        move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
+    move_analysis = "\n".join(move_analysis_lines)
+
+    # Format other agents
+    if other_agents:
+        other_agent_lines = "\n".join(
+            [f"  • Agent {aid} is at (row {pos[0]}, col {pos[1]})" for aid, pos in other_agents]
+        )
+    else:
+        other_agent_lines = "  • (no other agents present)"
+
+    # Format declared targets
+    declared_target_lines = []
+    for idx, (aid, tgt) in enumerate(zip(range(1, len(agent_targets) + 1), agent_targets)):
+        if aid == agent_id:
+            continue  # don't include self
+        if tgt is not None and other_agents and any(oaid == aid for oaid, _ in other_agents):
+            declared_target_lines.append(f"  • Agent {aid} → Goal {tgt}")
+    if declared_target_lines:
+        declared_targets_block = "\n".join(declared_target_lines)
+    else:
+        declared_targets_block = "  • (no goal commitments from other agents)"
+
+    # Format goals (unassigned)
+    goal_lines = "\n".join(
+        [f"  • Goal {chr(65+i)} is at (row {pos[0]}, col {pos[1]})" for i, pos in enumerate(goal_positions) if pos is not None]
+    )
+
+    # Dynamically list only the existing goal labels in the environment description
+    existing_goal_labels = [chr(65+i) for i, pos in enumerate(goal_positions) if pos is not None]
+    if existing_goal_labels:
+        goal_label_str = ", ".join([f"**{label}**" for label in existing_goal_labels])
+    else:
+        goal_label_str = "(none)"
+
+    # Compute distance lines
+    distance_lines = []
+    for i, goal in enumerate(goal_positions):
+        if goal:
+            dist = shortest_path_length(agent_pos, goal, env)
+            distance_lines.append(f"* You are {dist} steps from Goal {chr(65 + i)}.")
+    for aid, apos in other_agents:
+        for i, goal in enumerate(goal_positions):
+            if goal:
+                dist = shortest_path_length(apos, goal, env)
+                distance_lines.append(f"* Agent {aid} is {dist} steps from Goal {chr(65 + i)}.")
+    distance_block = "\n".join(distance_lines)
+
+    # Calculate projected cell number if the agent moves in the proposed direction
+    move_offsets = {
+        'up': (1, 0),
+        'down': (-1, 0),
+        'left': (0, -1),
+        'right': (0, 1)
+    }
+    if direction in move_offsets:
+        r, c = agent_pos
+        dr, dc = move_offsets[direction]
+        target_pos = (r + dr, c + dc)
+        if 0 <= target_pos[0] < grid_size and 0 <= target_pos[1] < grid_size:
+            target_cell_id = target_pos[0] * grid_size + target_pos[1]
+            move_label_line = f"If you move **{direction}**, you will arrive at cell **{target_cell_id}**."
+        else:
+            move_label_line = f"If you move **{direction}**, you would go out of bounds."
+    else:
+        move_label_line = ""
+
+    return f"""
+**Environment**
+
+You are Agent {agent_id} (a blue **circle** labeled **{agent_id}**) on a {grid_size}×{grid_size} grid.  
+There are several red squares labeled {goal_label_str}. These are **unassigned goals** — you may approach any of them.  
+Black squares are obstacles that **cannot be entered**.  
+Other agents may be present — they are also shown as blue circles with numeric labels (1, 2, 3, ...).  
+All empty cells are labeled with a gray number in the background to assist reasoning.  
+Cell labels increase from the **bottom-left**, moving **left to right**, then **up row by row**.
+
+Four colored borders define direction:
+* green (top) → **up**
+* gray (bottom) → **down**
+* yellow (left) → **left**
+* blue (right) → **right**
+
+All coordinates are zero-indexed:
+- (0, 0) is the bottom-left corner
+- ({grid_size - 1}, {grid_size - 1}) is the top-right corner
+
+In the image:
+- Obstacles are black squares labeled **O**
+- Goals are red squares labeled {goal_label_str}
+- You are labeled **{agent_id}**
+- Other agents are labeled numerically
+
+A simulation step means that every agent takes one move at the same time. The simulation ends when all agents have reached a goal. Your job is to minimize the total number of simulation steps — the number of moves until the last agent finishes.
+Your goal is to minimize the total number of simulation steps required for all agents to reach the goals.
+
+A simulation step means that all agents move once at the same time. The simulation ends when every agent has reached a goal. Therefore, the total number of steps is determined by the agent that takes the most steps to reach their goal. In other words:
+
+    Total steps = the number of steps taken by the last agent to reach a goal.
+
+❗ This has important consequences:
+
+    You should not just minimize your own distance to a goal.
+
+    Sometimes, it is better to go to a further goal so that another agent can take a closer goal, which reduces how long they need to move.
+
+    If you take the closest goal selfishly, another agent might be forced to take a distant one, increasing the total simulation time.
+
+    Your decision should consider the positions of all agents and goals, and aim for the best global assignment.
+
+✅ Example:
+
+    You are 3 steps from Goal A and 6 steps from Goal B.
+
+    Agent 2 is 6 steps from Goal A and 4 steps from Goal B.
+
+    If you take Goal A and Agent 2 takes Goal B, the simulation ends in 4 steps (you finish in 3, Agent 2 in 4).
+
+    If you take Goal B and Agent 2 takes Goal A, the simulation ends in 6 steps.
+
+    So you should take Goal A — not because it’s closer, but because this choice leads to the shortest total simulation.
+
+Your reasoning and goal selection should be based on this principle.
+
+**Current state**  
+* Your position        … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* Obstacles            … {obs_coords or "none"}  
+* Other agents         …  
+{other_agent_lines}
+* Declared targets     …  
+{declared_targets_block}
+* Goal locations       …  
+{goal_lines}
+
+**Distances to goals**  
+{distance_block}
+
+**Memory (last 5 moves)**  
+{history_lines}
+
+**Move Analysis (cell visit frequency)**  
+{move_analysis}
+
+---
+
+### Question
+
+Should Agent {agent_id} move **{direction}**?  
+{move_label_line}  
+What goal should Agent {agent_id} pursue?
+
+---
+
+### Instructions (read carefully before responding)
+
+1. **Legal actions** - do not walk into obstacles or off the grid.
+2. **Goal coverage** - each goal must be reached by one agent, but **goals are unassigned**.
+3. **Coordination assumption** - you cannot communicate with other agents. Avoid chasing the same goal as others if better options exist.
+4. **Team objective** - The goal is to minimize the total number of simulation steps. In this simulation, each step means all agents move once, and the total is the number of steps until all agents have reached their goals. So if one agent takes 2 steps and another takes 8, the total is 8 - the time it takes for the last agent to finish.
+5. **Don't be greedy** - DO NOT just go to the closest goal. Think about the whole team. Sometimes it is better for you to take a longer path so that another agent can reach a closer goal faster. Your goal is to minimize the number of total simulation steps, not just your own effort. Thus, you are minimizing the time it takes for the **last/slowest** agent to finish.
+6. **Output format** - respond with exactly one word: YES or NO. All caps. No punctuation or extra explanation.
+7. **Diagonal wall rule** - if two obstacles touch at corners, a thick black diagonal means you cannot pass through that diagonal.
+8. **Coordination via targets** - You are aware of other agents' chosen goals. If your selected target goal conflicts with theirs, consider whether **you** should change. Do not change without a reason — prefer to stay on your current goal unless a conflict clearly requires resolution.
+9. **Explanation** - Give a brief 1-2 sentence explanation of your reasoning for the move and goal choice in the explanation field.
+10. **Response structure** - Provide your answer in a JSON format with keys "move", "target", and "explanation". However, do not include the json wrapper with the triple quotes in your response, just the JSON object itself in plain text format. DO NOT WRITE THE TRIPLE QUOTES JSON.
+11. Example - Suppose there are 2 goals:
+
+    Goal A is 3 steps from you, 6 steps from Agent 2
+
+    Goal B is 5 steps from you, 4 steps from Agent 2
+
+If you take Goal A, Agent 2 must go to Goal B, which takes 4 steps. You both finish in 5 steps.
+But if you go to Goal B, and Agent 2 takes Goal A, you finish in 5, and Agent 2 takes 6. The total is 6 — higher.
+
+The total number of steps = the number of steps it takes for the slowest agent to finish.
+You must reason about who should take which goal to minimize the total number of simulation steps.
+Try to also think about the **long-term** consequences of your move, not just the immediate distance. If you take a goal, how does it affect the other agents' choices? Will it lead to a longer total time for the team?
+Do not pick the furthest goal just to avoid conflict. Instead, think about the overall team efficiency, since if you pick a goal that's further for you than another agent, it might lead to a longer total time for the team because of YOU. They should pick that goal instead. You should pick the goal that might be closer to you and they should pick that's further for them, if it leads to a shorter total time for the team.
+Don't be too much of a pushover, but also don't be too selfish. Think about the team and how to minimize the total number of simulation steps.
+
+DO NOT AVOID CONFLICTS JUST TO AVOID THEM.
+    If you see a conflict, think about whether it is better for you to change your goal or for the other agent to change theirs. If you can resolve the conflict in a way that minimizes the total number of simulation steps, do so.
+
+Respond in the JSON format:
+{{
+  "move": "YES or NO in CAPS",
+  "target": "(goal letter, e.g. A, B, ... in CAPS)",
+  "explanation": "(brief justification for your choice, 1-2 sentences)"
+}}
+"""
+

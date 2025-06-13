@@ -72,7 +72,8 @@ def simulate_from_log(
     print("\n✅ Simulation complete.")
 
 if __name__ == "__main__":
-    csv_path = "results_team/agent_com_unstruc_case_1_local_greed_trial1_log.csv"
-    initial_positions = [(3, 1), (3, 5)]
-    goal_positions = [(1, 4), (0, 6)]
-    simulate_from_log(csv_path, initial_positions, goal_positions, obstacles={(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)})
+    csv_path = "data/agent_step_logs.csv"
+    agent_starts=[(2, 0), (2, 3)]
+    goal_positions=[(1, 4), (7, 7)]
+    obstacles={(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)}
+    simulate_from_log(csv_path, agent_starts, goal_positions, obstacles=obstacles)

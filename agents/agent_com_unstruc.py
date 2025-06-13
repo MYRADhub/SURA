@@ -219,8 +219,9 @@ if __name__ == "__main__":
     steps, optimal, failed, collisions = run(
         grid_size=8,
         num_agents=2,
-        agent_starts=[(7, 0), (4, 6)],
-        goal_positions=[(2, 6), (0, 0)]
+        agent_starts=[(2, 0), (2, 3)],
+        goal_positions=[(1, 4), (7, 7)],
+        obstacles={(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)}
     )
     print(f"\n✅ Task completed!")
     print(f"Optimal: {optimal}, Steps: {steps}, Failed: {failed}, Collisions: {collisions}")
