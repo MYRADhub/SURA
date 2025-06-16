@@ -1284,7 +1284,7 @@ def build_target_selection_prompt(
 
     # Goal locations
     goal_lines = "\n".join(
-        [f"  • Goal {chr(65+i)} is at (row {r}, col {c})" for i, (r, c) in enumerate(goal_positions) if (r, c)]
+        [f"  • Goal {chr(65+i)} is at (row {r}, col {c})" for i, pos in enumerate(goal_positions) if pos is not None for r, c in [pos]]
     )
 
     # Other agents' positions
@@ -1455,9 +1455,16 @@ def build_direction_selection_prompt(
             move_label_line = f"If you move **{direction}**, you would go out of bounds."
 
     # Declared goal location
-    goal_index = ord(declared_goal.upper()) - 65
-    goal_pos = goal_positions[goal_index] if 0 <= goal_index < len(goal_positions) else None
-    goal_line = f"* Your current target goal is **Goal {declared_goal}**, located at (row {goal_pos[0]}, col {goal_pos[1]})." if goal_pos else "* You have a declared goal, but its location is not known."
+    if declared_goal is not None:
+        goal_index = ord(declared_goal.upper()) - 65
+        goal_pos = goal_positions[goal_index] if 0 <= goal_index < len(goal_positions) else None
+        if goal_pos is not None:
+            goal_line = f"* Your current target goal is **Goal {declared_goal}**, located at (row {goal_pos[0]}, col {goal_pos[1]})."
+        else:
+            goal_line = "* You have a declared goal, but its location is not known."
+    else:
+        goal_line = "* You have not declared a goal yet."
+
 
     # Declared targets of others
     declared_targets_block = []

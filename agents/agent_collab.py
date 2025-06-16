@@ -118,6 +118,7 @@ def run(
         print(f"\n--- Step {step} ---")
         plot_grid_unassigned_labeled(env, image_path=image_path)
         proposals = agent_positions[:]
+        proposed_goals = target_goals[:]
 
         for i in range(num_agents):
             if not active[i] or agent_positions[i] is None:
@@ -149,7 +150,7 @@ def run(
             print(f"Agent {agent_id} target selection response:\n{target_response}")
             new_target, target_explanation = parse_target_response(target_response)
             if new_target:
-                target_goals[i] = new_target
+                proposed_goals[i] = new_target
                 print(f"Agent {agent_id} selected target: {new_target}")
             if target_explanation:
                 print(f"Target reasoning: {target_explanation}")
@@ -185,7 +186,7 @@ def run(
             if scores:
                 best = max(scores, key=scores.get)
                 move, explanation = move_explanations[best]
-                print(f"Agent {agent_id} moves {best} toward goal {target_goals[i]}")
+                print(f"Agent {agent_id} moves {best} toward goal {proposed_goals[i]}")
                 print(f"Explanation: {explanation}")
                 proposals[i] = env.move_agent(agent_pos, best)
                 top_goals = extract_top_goals(logprobs_by_dir[best])
@@ -211,6 +212,8 @@ def run(
             else:
                 print(f"Agent {agent_id} has no valid moves and stays at {agent_pos}")
                 proposals[i] = agent_pos
+
+        target_goals = proposed_goals[:]
 
         # Collision resolution
         new_positions = proposals[:]
