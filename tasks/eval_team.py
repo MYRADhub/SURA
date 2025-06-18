@@ -17,7 +17,8 @@ TRIALS_PER_CASE = 2
 TASKS = [
     ("agent_yesno_unassigned", "agents.agent_yesno_unassigned"),
     ("agent_com_unassigned", "agents.agent_com_unassigned"),
-    ("agent_com_unstruc", "agents.agent_com_unstruc")
+    ("agent_com_unstruc", "agents.agent_com_unstruc"),
+    ("agent_collab", "agents.agent_collab"),
 ]
 
 # Shared obstacle layout (no overlaps)
@@ -55,23 +56,19 @@ def evaluate_team(task_key, run_fn):
         for case_name, cfg in cases.items():
             for trial in range(TRIALS_PER_CASE):
                 print(f"\n--- {case_name}, Trial {trial+1} ---")
-                env = GridWorld(GRID_SIZE, obstacles=obstacles)
-                env.initialize_agents_goals_custom(agents=cfg["agents"], goals=cfg["goals"])
+                case_config_path = cfg  # it's already a path string to YAML
 
                 if VISUALIZE:
+                    env = GridWorld(case_config_path)
                     plot_grid_unassigned(env, image_path=f"data/{task_key}_{case_name}_t{trial+1}.png")
 
                 case_log_path = os.path.join(OUTPUT_DIR, f"{task_key}_{case_name}_trial{trial+1}_log.csv")
 
                 steps, optimal, failed, collisions = run_fn(
-                    grid_size=GRID_SIZE,
-                    obstacles=obstacles,
+                    config_path=case_config_path,
                     log_path=case_log_path,
-                    agent_starts=cfg["agents"],
-                    goal_positions=cfg["goals"],
                     image_path=IMAGE_PATH,
-                    max_steps=30,
-                    num_agents=len(cfg["agents"])
+                    max_steps=30
                 )
 
                 writer.writerow([case_name, trial+1, steps, optimal, int(failed), collisions])
