@@ -106,7 +106,7 @@ def send_image_to_model_openai(image_path, prompt, temperature=None):
     print('Received response')
     return response.choices[0].message.content.strip().lower()
 
-def send_image_to_model_openai_logprobs(image_path, prompt, temperature=None):
+def send_image_to_model_openai_logprobs(image_path, prompt, model="gpt-4o", temperature=None):
     load_dotenv()
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
@@ -117,7 +117,7 @@ def send_image_to_model_openai_logprobs(image_path, prompt, temperature=None):
     print('Sending request to OpenAI API')
 
     params = {
-        "model": "gpt-4.1",
+        "model": model,
         "messages": [
             {
                 "role": "user",
