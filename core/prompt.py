@@ -1269,7 +1269,8 @@ def build_target_selection_prompt(
     memory,
     visits,
     agent_targets,
-    target_memory=None,
+    target_memory,
+    distances
 ):
     obs_coords = ', '.join(f"({r}, {c})" for r, c in sorted(obstacles))
 
@@ -1296,6 +1297,15 @@ def build_target_selection_prompt(
         if other_agents
         else "  • (no other agents present)"
     )
+
+    distance_table_lines = []
+    for aid, dist_list in distances.items():
+        row = f"  • Agent {aid}: " + ", ".join(
+            f"{chr(65 + i)} = {d if d != float('inf') else '∞'}"
+            for i, d in enumerate(dist_list)
+        )
+        distance_table_lines.append(row)
+    distance_block = "\n".join(distance_table_lines)
 
     declared_target_lines = [
         f"  • Agent {aid} → Goal {tgt}"
@@ -1467,6 +1477,9 @@ Switching: You → Goal A (6 steps) & Agent 3 stays on C → longest path = 6 < 
 **Previous target selections**  
 {past_targets_lines}
 
+**Agent-to-Goal Distances (in steps)**  
+{distance_block}
+
 ---
 
 ### Question
@@ -1483,7 +1496,6 @@ Return **only** JSON:
 ````
 
 """
-
 
 def build_direction_selection_prompt(
     agent_id,

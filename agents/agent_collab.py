@@ -85,7 +85,8 @@ def select_target(
     agent_targets,
     target_memory,
     image_path,
-    step
+    step,
+    distances
 ):
     prompt = build_target_selection_prompt(
         agent_id=agent_id,
@@ -97,7 +98,8 @@ def select_target(
         memory=memory,
         visits=visits,
         agent_targets=agent_targets,
-        target_memory=target_memory
+        target_memory=target_memory,
+        distances=distances
     )
     time.sleep(0.5)
     response, _ = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
@@ -133,7 +135,6 @@ def select_direction(
     env
 ):
     valid = env.get_valid_actions(agent_pos)
-    print(valid)
     scores = {}
     logprobs_by_dir = {}
     explanations = {}
@@ -263,6 +264,14 @@ def run(
                 if j != i and agent_positions[j] is not None
             ]
 
+            distances = {
+                agent_ids[j]: [
+                    shortest_path_length(agent_positions[j], goal, env) if agent_positions[j] and goal else float("inf")
+                    for goal in env.goals
+                ]
+                for j in range(num_agents)
+            }
+
             new_target, target_explanation = select_target(
                 agent_id=agent_id,
                 agent_pos=agent_pos,
@@ -275,7 +284,8 @@ def run(
                 agent_targets=target_goals,
                 target_memory=target_memories[i],
                 image_path=image_path,
-                step=step
+                step=step,
+                distances=distances
             )
 
             if new_target:
@@ -376,8 +386,8 @@ def run(
 
 
 if __name__ == "__main__":
-    steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
-    # steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
+    # steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
+    steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
     # steps, optimal, failed, collisions = run(
     #     grid_size=8,
     #     obstacles={(1, 0), (5, 5), (2, 3)},
