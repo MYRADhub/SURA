@@ -1269,130 +1269,221 @@ def build_target_selection_prompt(
     memory,
     visits,
     agent_targets,
+    target_memory=None,
 ):
-    # Format obstacle coordinates
-    obs_coords = ', '.join([f"({r}, {c})" for r, c in sorted(obstacles)])
+    obs_coords = ', '.join(f"({r}, {c})" for r, c in sorted(obstacles))
 
-    # Memory (movement history)
     if memory:
         history_lines = "\n".join(
-            [f"  • {i+1}. you moved from (row {r0}, col {c0}) **{dir_}** → (row {r1}, col {c1})"
-             for i, (r0, c0, dir_, r1, c1) in enumerate(memory[:5])]
+            f"  • {i+1}. You moved from (row {r0}, col {c0}) **{d}** → (row {r1}, col {c1})"
+            for i, (r0, c0, d, r1, c1) in enumerate(memory[:5])
         )
     else:
         history_lines = "  • (no prior moves — this is the first step)"
 
-    # Goal locations
     goal_lines = "\n".join(
-        [f"  • Goal {chr(65+i)} is at (row {r}, col {c})" for i, pos in enumerate(goal_positions) if pos is not None for r, c in [pos]]
+        f"  • Goal {chr(65+i)} is at (row {r}, col {c})"
+        for i, pos in enumerate(goal_positions)
+        if pos is not None
+        for r, c in [pos]
     )
 
-    # Other agents' positions
-    if other_agents:
-        other_agent_lines = "\n".join(
-            [f"  • Agent {aid} is at (row {pos[0]}, col {pos[1]})" for aid, pos in other_agents]
+    other_agent_lines = (
+        "\n".join(
+            f"  • Agent {aid} is at (row {p[0]}, col {p[1]})"
+            for aid, p in other_agents
+        )
+        if other_agents
+        else "  • (no other agents present)"
+    )
+
+    declared_target_lines = [
+        f"  • Agent {aid} → Goal {tgt}"
+        for aid, tgt in zip(range(1, len(agent_targets) + 1), agent_targets)
+        if aid != agent_id and tgt and any(aid == oa[0] for oa in other_agents)
+    ]
+    declared_targets_block = (
+        "\n".join(declared_target_lines)
+        if declared_target_lines
+        else "  • (no goal commitments from other agents)"
+    )
+
+    if target_memory:
+        past_targets_lines = "\n".join(
+            f"  • Step {step}: chose Goal {tgt} — {ex}"
+            for step, tgt, ex in target_memory[-5:]
         )
     else:
-        other_agent_lines = "  • (no other agents present)"
-
-    # Other agents' declared goals
-    declared_target_lines = []
-    for idx, (aid, tgt) in enumerate(zip(range(1, len(agent_targets)+1), agent_targets)):
-        if aid == agent_id:
-            continue
-        if tgt is not None and any(oaid == aid for oaid, _ in other_agents):
-            declared_target_lines.append(f"  • Agent {aid} → Goal {tgt}")
-    declared_targets_block = "\n".join(declared_target_lines) if declared_target_lines else "  • (no goal commitments from other agents)"
+        past_targets_lines = "  • (no prior target selections)"
 
     return f"""
 **Environment**
 
-You are Agent {agent_id} (a blue circle labeled **{agent_id}**) on a {grid_size}×{grid_size} grid.  
-Your job is to choose which goal you will pursue next.  
-There are red squares labeled A, B, C, etc. that represent **unassigned goals** — any agent may choose to pursue any of them.  
-Other agents may also be present on the grid, and they may already be targeting some goals.  
-Black squares are obstacles that cannot be entered.  
-Empty cells are labeled with gray numbers to help you reason spatially.  
-The cell numbers increase **left to right**, then **bottom to top**, like reading lines of text.
+You are Agent {agent_id} (blue circle **{agent_id}**) on a {grid_size}×{grid_size} grid.  
+Choose **one** goal to pursue (red squares A, B, C…).  
+Obstacles: black squares. Empty cells: gray numbers (left→right, bottom→top).
 
-All coordinates are zero-indexed:  
-- (0, 0) is the **bottom-left corner**  
-- ({grid_size - 1}, {grid_size - 1}) is the **top-right corner**
+**Simulation mechanics**
 
-**Simulation mechanics:**
+- All agents move **simultaneously** each timestep.  
+- The run ends when **every** goal is reached.  
+- **Total cost = number of timesteps until the *last* agent finishes.**
 
-- The simulation runs in **timesteps**.  
-- **At each timestep, every agent moves once.**  
-- The simulation ends when **all agents have reached their goals**.
-- The total number of steps is defined as the **number of timesteps it takes for the last agent to finish**.
-
-> ✅ This means your goal is to **minimize the number of total simulation steps**, not your personal path length.
+Your objective is to **minimise this total cost**, not merely your own distance.
 
 ---
 
-### 🧠 Key Concepts
+**Grid layout**  
+• The world is a square {grid_size} × {grid_size} grid.  
+• **Coordinates are zero-indexed**: (row 0, col 0) is the *bottom-left*; (row {grid_size-1}, col {grid_size-1}) is the *top-right*.  
+• Each empty cell shows its coordinate in light-grey text – formatted “row,col” (e.g. `02,05` means row 2, col 5).  
+• Horizontal rows are numbered upward; vertical columns numbered left→right.  
 
-• If one agent takes 3 steps and another takes 7 steps, the **total cost is 7** — because that's when the last goal is reached.
+**Cell types & colours**  
+| Colour / glyph | Meaning | Example label | Notes |  
+|----------------|---------|---------------|-------|  
+| 🔵 Blue circle with white number | *Agent* (that number is their ID) | 1 | You are one of these. |  
+| 🟥 Solid red square | *Unassigned goal* | A, B, C… | Any agent may pursue; each goal must be claimed by exactly one agent. |  
+| ⬛ Black square (“O”) | *Obstacle* | O | Impassable. Cannot stand on or move through. |  
+| ◻️ Light-grey “row,col” | Empty cell | `04,07` | Traversable. |  
 
-• If you choose the closest goal selfishly, another agent might be forced to take a longer path to a farther goal, increasing the total simulation time.
+**Coloured border clues**  
+• Top border = green (↑ up) • Bottom = orange (↓ down)  
+• Left = yellow (← left)   • Right = blue (→ right)  
 
-• Sometimes it's better for you to choose a **farther goal**, so another agent can take a **closer** one.
+**Diagonal wall rule**  
+If two black squares touch only at a corner, a thick black diagonal bar is drawn – you cannot cut through that diagonal.  
 
-• This way, **everyone finishes earlier**, and the team achieves the goal faster.
+**Turn-based movement**  
+• Time advances in **timesteps**.  
+• In each timestep **all agents move simultaneously** (or stay).  
+• Valid moves: up, down, left, right (one cell). You cannot enter obstacles or off-grid cells.  
+
+**When does the simulation end?**  
+– As soon as *every* goal has an agent standing on it.  
+
+**Team cost metric**  
+– We measure the total runtime as the **number of timesteps until the last agent reaches its goal**.  
+– Your objective is to choose goals (and later moves) so that this “last-agent” finish time is as small as possible; minimise the **maximum** path length among all agents.  
+
+**Why goal choice matters**  
+– Picking the closest goal for yourself is sometimes *worse* for the team, because it may force another agent onto a very long route.  
+– Always compare alternative assignments and pick the one with the **shorter longest path** – even if that means taking a slightly farther goal personally.
 
 ---
 
-### ✅ Example
+### ➊ Key reasoning rules
 
-- You are 3 steps from Goal A and 6 steps from Goal B.  
-- Agent 2 is 6 steps from Goal A and 4 steps from Goal B.  
+1. **No duplication**: each goal should end up with exactly one agent.  
+2. **Greedy ≠ optimal**: sometimes you must pick a farther goal so another agent can finish sooner.  
+3. **Don’t be a pushover**: if you’re clearly the best-placed agent for a goal, keep it unless switching lowers total cost.  
+4. Use relative distances, obstacles, and potential path conflicts to decide.
+5. Try to think of different assignments and their longest paths and then evaluate which one is the best for you and the team, do not get stuck on one assignment and its explanation.
 
-→ If **you** take Goal A and Agent 2 takes Goal B, total time = 4 steps.  
-→ If **you** take Goal B and Agent 2 takes Goal A, total time = 6 steps.  
+---
 
-✅ You should take **Goal A** to minimize the total time — even though it’s closer to you.
+### ➋ Team-level reasoning checklist ✅  
+(Think silently through these steps before answering.)
+
+1. List every **remaining goal** and estimate which agent is currently fastest to reach it.  
+2. Draft a **full assignment** (agents → goals, no duplicates).  
+3. Compute that assignment’s **longest path length** (this defines total cost).  
+4. Try at least one alternative assignment; see if the longest path shrinks.  
+5. Select the goal for **you** that belongs to the assignment with the **smallest longest-path**.  
+6. Apply conflict guidelines (below) to decide whether to keep or switch when ties/conflicts arise.
+
+---
+
+### ➌ Conflict-resolution guidelines 🚦  
+*(Two or more agents want the same goal — what now?)*  
+
+1. **Enumerate both assignments**  
+   *A1 → G₁ & A2 → G₂* **vs.** *A1 → G₂ & A2 → G₁* (swap the contested goal).  
+
+2. **Compute each agent’s path length** for both assignments.  
+
+3. **Find the longest path** in each assignment (that’s the team’s total time).  
+
+4. **Pick the assignment with the smaller longest-path**, even if that means **you** take the farther goal.  
+
+#### Worked conflict example ⚖️  
+
+```
+
+Grid (rows shown top-down)        Key
+1 . . . . . 2 . . .               1,2  = agents
+. . # . . . B . # A               A,B  = goals
+. . . . . . . . .                 #    = obstacle
+
+````
+
+*Distances (in steps avoiding obstacles)*  
+
+| Agent | → Goal A | → Goal B |
+|-------|----------|----------|
+| **1** | 10       | 7        |
+| **2** | 4        | 1        |
+
+**Team-optimal choice** (Agent 2 takes nearest)  
+*1 → A (10)*, *2 → B (1)* ⇒ longest path = **10**  ❌ worse  
+
+**Greedy choice** (Agent 1 takes nearest, Agent 2 let's it happen even though it's only 1 step away)  
+*1 → B (7)*, *2 → A (4)* ⇒ longest path = **7**  
+
+But reverse the distances and obstacles and the result can flip.  
+**Always run the four-step checklist above; choose the assignment with the smaller longest path — even if that means taking the farther goal yourself.**
+
+---
+
+### ➍ Worked examples
+
+**Example A — keep your goal**  
+- You → Goal B: 3 steps  
+- Agent 2 → Goal B: 5 steps  
+Alternative assignments give total ≥ 5 steps.  
+👉 You keep Goal B; Agent 2 switches.
+
+**Example B — switch goals**  
+- You → Goal C: 8 steps  
+- Agent 3 → Goal C: 4 steps  
+Switching: You → Goal A (6 steps) & Agent 3 stays on C → longest path = 6 < 8.  
+👉 You switch to Goal A.
 
 ---
 
 **Current state**  
-* Your position        … **(row {agent_pos[0]}, col {agent_pos[1]})**  
-* Obstacles            … {obs_coords or "none"}  
-* Other agents         …  
+* Your position … **(row {agent_pos[0]}, col {agent_pos[1]})**  
+* Obstacles … {obs_coords or "none"}  
+* Other agents …  
 {other_agent_lines}
-* Declared targets     …  
+* Declared targets …  
 {declared_targets_block}
-* Goal locations       …  
+* Goal locations …  
 {goal_lines}
 
 **Memory (last 5 moves)**  
 {history_lines}
 
+**Previous target selections**  
+{past_targets_lines}
+
 ---
 
 ### Question
 
-Which goal should Agent {agent_id} pursue?  
-Choose one of the red-labeled goal letters (A, B, C, ...).
+Which goal should Agent {agent_id} pursue **now**?  
+Return **only** JSON:
 
----
-
-### Instructions
-
-1. Each goal must be reached by exactly one agent — no duplication.
-2. Do **not** choose based only on your own path. Consider the **team**.
-3. Try to minimize the total number of timesteps for **everyone**.
-4. Avoid taking a goal if another agent is clearly closer — unless doing so helps the team finish faster.
-5. Use spatial reasoning based on positions, not just distance.
-6. Respond only in the following format:
-
-Respond in the JSON format:
 ```json
 {{
-  "target": "(goal letter, e.g. A, B, ... in CAPS)",
-  "explanation": "(brief justification for your choice, 1-2 sentences)"
+  "reasoning": "Step-by-step thoughts: consider agent distances, conflicts, tradeoffs, and explain your decision path.",
+  "explanation": "One or two sentence summary of your final goal choice.",
+  "target": "Goal letter (e.g., A, B, C)"
 }}
-```
+````
+
 """
+
 
 def build_direction_selection_prompt(
     agent_id,
@@ -1459,7 +1550,10 @@ def build_direction_selection_prompt(
         goal_index = ord(declared_goal.upper()) - 65
         goal_pos = goal_positions[goal_index] if 0 <= goal_index < len(goal_positions) else None
         if goal_pos is not None:
-            goal_line = f"* Your current target goal is **Goal {declared_goal}**, located at (row {goal_pos[0]}, col {goal_pos[1]})."
+            goal_line = (
+                f"* Your current target goal is **Goal {declared_goal}**, located at (row {goal_pos[0]}, col {goal_pos[1]}). "
+                "Only you should enter this goal. Do not enter goals assigned to other agents."
+            )
         else:
             goal_line = "* You have a declared goal, but its location is not known."
     else:
@@ -1496,6 +1590,8 @@ Cell numbers increase left to right, then row by row from bottom to top.
 * Declared targets     …  
 {declared_block}
 
+* Goal assignments … Each goal must be reached by exactly one agent. Avoid stepping into another agent’s goal.
+
 **Memory (last 5 moves)**  
 {history_lines}
 
@@ -1513,11 +1609,12 @@ Should Agent {agent_id} move **{direction}**?
 
 ### Instructions
 
-1. Only respond YES if the move brings you closer to your goal and avoids danger.
+1. Only respond YES if the move brings you closer to your own goal and avoids danger.
 2. DO NOT move into obstacles or off the grid.
-3. If another agent is nearby or heading to the same area, consider avoiding a collision.
-4. Use your declared goal to reason about where to go — you are committed to it unless a new plan is made.
-5. Do not block others if there’s a better route for the team.
+3. DO NOT enter a goal cell that is assigned to another agent, even if it's closer.
+4. If another agent is nearby or heading to the same area, consider avoiding a collision.
+5. Use your declared goal to reason about where to go — you are committed to it unless a new plan is made.
+6. Do not block others if there’s a better route for the team.
 
 Respond in the JSON format:
 ```json

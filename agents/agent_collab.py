@@ -40,18 +40,18 @@ def parse_target_response(text):
         if match:
             json_str = match.group(1)
         else:
-            # Fallback: try to find first '{'
             json_start = text.index('{')
             json_str = text[json_start:]
         parsed = json.loads(json_str)
-        target = parsed.get("target", "").strip().upper()
+        reasoning = parsed.get("reasoning", "").strip()
         explanation = parsed.get("explanation", "").strip()
-        return target, explanation
+        target = parsed.get("target", "").strip().upper()
+        return target, explanation, reasoning
     except Exception as e:
         print(f"Failed to parse target JSON: {e}")
         with open("fails.txt", "a") as f:
             f.write(f"[Target Parsing Error] {e}\n{text}\n\n")
-        return None, ""
+        return None, "", ""
 
 def parse_move_response(text):
     try:
@@ -72,6 +72,135 @@ def parse_move_response(text):
         with open("fails.txt", "a") as f:
             f.write(f"[Move Parsing Error] {e}\n{text}\n\n")
         return None, ""
+
+def select_target(
+    agent_id,
+    agent_pos,
+    goal_positions,
+    other_agents,
+    grid_size,
+    obstacles,
+    memory,
+    visits,
+    agent_targets,
+    target_memory,
+    image_path,
+    step
+):
+    prompt = build_target_selection_prompt(
+        agent_id=agent_id,
+        agent_pos=agent_pos,
+        goal_positions=goal_positions,
+        other_agents=other_agents,
+        grid_size=grid_size,
+        obstacles=obstacles,
+        memory=memory,
+        visits=visits,
+        agent_targets=agent_targets,
+        target_memory=target_memory
+    )
+    time.sleep(0.5)
+    response, _ = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
+    print(f"Agent {agent_id} target selection response:\n{response}")
+    target, explanation, reasoning = parse_target_response(response)
+
+    if target:
+        print(f"Agent {agent_id} selected target: {target}")
+    if reasoning:
+        print(f"Target reasoning: {reasoning}")
+    if explanation:
+        print(f"Target summary: {explanation}")
+
+    if target or explanation:
+        target_memory.append((step, target, explanation))
+        if len(target_memory) > 5:
+            target_memory[:] = target_memory[-5:]
+
+    return target, explanation
+
+def select_direction(
+    agent_id,
+    agent_pos,
+    declared_goal,
+    goal_positions,
+    other_agents,
+    grid_size,
+    obstacles,
+    memory,
+    visits,
+    agent_targets,
+    image_path,
+    env
+):
+    valid = env.get_valid_actions(agent_pos)
+    print(valid)
+    scores = {}
+    logprobs_by_dir = {}
+    explanations = {}
+
+    for direction in valid:
+        prompt = build_direction_selection_prompt(
+            agent_id=agent_id,
+            agent_pos=agent_pos,
+            declared_goal=declared_goal,
+            goal_positions=goal_positions,
+            other_agents=other_agents,
+            grid_size=grid_size,
+            obstacles=obstacles,
+            direction=direction,
+            memory=memory,
+            visits=visits,
+            agent_targets=agent_targets
+        )
+        time.sleep(0.5)
+        response, logprobs = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
+        score = extract_yes_logprob(logprobs)
+        scores[direction] = score
+        logprobs_by_dir[direction] = logprobs
+        move, explanation = parse_move_response(response)
+        explanations[direction] = (move, explanation)
+
+    if not scores:
+        return None, None, None, {}
+
+    best = max(scores, key=scores.get)
+    move, explanation = explanations[best]
+    print(f"Agent {agent_id} moves {best} toward goal {declared_goal}")
+    print(f"Explanation: {explanation}")
+
+    return best, explanation, logprobs_by_dir[best], scores
+
+def select_direction_opt(agent_pos, declared_goal, goal_positions, env):
+    """
+    Select the direction that reduces the distance to the target goal the fastest.
+    """
+    if not declared_goal:
+        return None
+
+    goal_index = ord(declared_goal.upper()) - 65
+    if goal_index >= len(goal_positions) or goal_positions[goal_index] is None:
+        return None
+
+    target_goal = goal_positions[goal_index]
+    best_dir = None
+    best_dist = float('inf')
+
+    directions = {
+        "up": (1, 0),
+        "down": (-1, 0),
+        "left": (0, -1),
+        "right": (0, 1)
+    }
+
+    for dir_str, (dr, dc) in directions.items():
+        new_pos = (agent_pos[0] + dr, agent_pos[1] + dc)
+        if env.is_valid(new_pos):
+            dist = shortest_path_length(new_pos, target_goal, env)
+            if dist < best_dist:
+                best_dist = dist
+                best_dir = dir_str
+    return best_dir
+
 
 def run(
     image_path="data/grid.png",
@@ -100,6 +229,7 @@ def run(
     active = [True] * num_agents
     visits = [{} for _ in range(num_agents)]
     memories = [[] for _ in range(num_agents)]
+    target_memories = [[] for _ in range(num_agents)]  # memory of past target choices
     target_goals = [None for _ in range(num_agents)]
     step = 0
     collisions = 0
@@ -133,8 +263,7 @@ def run(
                 if j != i and agent_positions[j] is not None
             ]
 
-            # Target selection phase
-            target_prompt = build_target_selection_prompt(
+            new_target, target_explanation = select_target(
                 agent_id=agent_id,
                 agent_pos=agent_pos,
                 goal_positions=env.goals,
@@ -143,53 +272,39 @@ def run(
                 obstacles=obstacles,
                 memory=memories[i],
                 visits=visits[i],
-                agent_targets=target_goals
+                agent_targets=target_goals,
+                target_memory=target_memories[i],
+                image_path=image_path,
+                step=step
             )
-            time.sleep(0.5)
-            target_response, _ = send_image_to_model_openai_logprobs(image_path, target_prompt, temperature=0.0000001)
-            print(f"Agent {agent_id} target selection response:\n{target_response}")
-            new_target, target_explanation = parse_target_response(target_response)
+
             if new_target:
                 proposed_goals[i] = new_target
-                print(f"Agent {agent_id} selected target: {new_target}")
-            if target_explanation:
-                print(f"Target reasoning: {target_explanation}")
+                print(f"Agent {agent_id} proposed target: {new_target}")
 
-            # Move selection phase
-            valid = env.get_valid_actions(agent_pos)
-            scores = {}
-            logprobs_by_dir = {}
-            move_explanations = {}
+            best, explanation, logprobs, scores = select_direction(
+                agent_id=agent_id,
+                agent_pos=agent_pos,
+                declared_goal=new_target,
+                goal_positions=env.goals,
+                other_agents=other_infos,
+                grid_size=grid_size,
+                obstacles=obstacles,
+                memory=memories[i],
+                visits=visits[i],
+                agent_targets=target_goals,
+                image_path=image_path,
+                env=env
+            )
+            # best = select_direction_opt(agent_pos, new_target, env.goals, env)
+            # print(f"Agent {agent_id} selected direction: {best}")
 
-            for direction in valid:
-                dir_prompt = build_direction_selection_prompt(
-                    agent_id=agent_id,
-                    agent_pos=agent_pos,
-                    declared_goal=target_goals[i],
-                    goal_positions=env.goals,
-                    other_agents=other_infos,
-                    grid_size=grid_size,
-                    obstacles=obstacles,
-                    direction=direction,
-                    memory=memories[i],
-                    visits=visits[i],
-                    agent_targets=target_goals
-                )
-                time.sleep(0.5)
-                response_text, logprobs = send_image_to_model_openai_logprobs(image_path, dir_prompt, temperature=0.0000001)
-                score = extract_yes_logprob(logprobs)
-                scores[direction] = score
-                logprobs_by_dir[direction] = logprobs
-                move, explanation = parse_move_response(response_text)
-                move_explanations[direction] = (move, explanation)
 
-            if scores:
-                best = max(scores, key=scores.get)
-                move, explanation = move_explanations[best]
-                print(f"Agent {agent_id} moves {best} toward goal {proposed_goals[i]}")
-                print(f"Explanation: {explanation}")
+            if best:
                 proposals[i] = env.move_agent(agent_pos, best)
-                top_goals = extract_top_goals(logprobs_by_dir[best])
+                print(f"Agent {agent_id} proposed move to {proposals[i]}")
+
+                top_goals = extract_top_goals(logprobs)
 
                 log_rows.append({
                     "step": step,
@@ -261,5 +376,16 @@ def run(
 
 
 if __name__ == "__main__":
-    steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml",)
+    steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
+    # steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
+    # steps, optimal, failed, collisions = run(
+    #     grid_size=8,
+    #     obstacles={(1, 0), (5, 5), (2, 3)},
+    #     agent_starts=[(0, 0), (1, 3)],
+    #     goal_positions=[(7, 7), (7, 5)],
+    #     num_agents=2,
+    #     image_path="data/agent_collab.png",
+    #     log_path="data/agent_collab_log.csv",
+    #     max_steps=30
+    # )
     print(f"\n✅ Done!\nOptimal: {optimal}, Steps: {steps}, Failed: {failed}, Collisions: {collisions}")
