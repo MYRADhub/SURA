@@ -25,38 +25,16 @@ obstacles = {(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)}
 
 # Hand-crafted coordination scenarios
 cases = {
-    "case_1_local_greed": {
-        "agents": [(3, 1), (3, 5)],
-        "goals":  [(1, 4), (0, 6)],
-    },
-    "case_2_decoy_efficiency": {
-        "agents": [(0, 0), (7, 0)],
-        "goals":  [(7, 7), (3, 4)],
-    },
-    "case_3_one_stays_back": {
-        "agents": [(1, 1), (2, 1), (7, 6)],
-        "goals":  [(6, 7), (1, 7), (3, 6)],
-    },
-    "case_4_tight_corridor": {
-        "agents": [(0, 1), (1, 0), (0, 0)],
-        "goals":  [(6, 1), (7, 2), (7, 1)],
-    },
-    "case_5_decoy_ignored": {
-        "agents": [(7, 0), (6, 0), (0, 7)],
-        "goals":  [(0, 0), (1, 1), (2, 2)],
-    },
-    "case_6_lane_assignment": {
-        "agents": [(2, 2), (2, 3), (2, 4)],
-        "goals":  [(6, 2), (6, 3), (6, 4)],
-    },
-    "case_7_vertical_choke": {
-        "agents": [(0, 3), (0, 5), (0, 7)],
-        "goals":  [(7, 3), (7, 5), (7, 7)],
-    },
-    "case_8_goal_stealing": {
-        "agents": [(6, 0), (6, 1), (6, 2)],
-        "goals":  [(0, 0), (0, 1), (0, 2)],
-    }
+    "case_1": "configs/case_1_local_greed.yaml",
+    "case_2": "configs/case_2_decoy_efficiency.yaml",
+    "case_3": "configs/case_3_one_stays_back.yaml",
+    "case_4": "configs/case_4_tight_corridor.yaml",
+    "case_5": "configs/case_5_decoy_ignored.yaml",
+    "case_6": "configs/case_6_lane_assignment.yaml",
+    "case_7": "configs/case_7_vertical_choke.yaml",
+    "case_8": "configs/case_8_goal_stealing.yaml",
+    "case_9": "configs/case_9_2_greedy_agents.yaml",
+    "case_10": "configs/case_10_insane.yaml"
 }
 
 def evaluate_team(task_key, run_fn):
