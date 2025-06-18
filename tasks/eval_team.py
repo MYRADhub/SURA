@@ -3,7 +3,7 @@ import os
 import argparse
 import importlib
 from core.environment import GridWorld
-from core.plot import plot_grid_unassigned
+from core.plot import plot_grid_unassigned_labeled
 
 # Constants
 IMAGE_PATH = "data/grid.png"
@@ -60,7 +60,7 @@ def evaluate_team(task_key, run_fn):
 
                 if VISUALIZE:
                     env = GridWorld(case_config_path)
-                    plot_grid_unassigned(env, image_path=f"data/{task_key}_{case_name}_t{trial+1}.png")
+                    plot_grid_unassigned_labeled(env, image_path=f"data/{task_key}_{case_name}_t{trial+1}.png")
 
                 case_log_path = os.path.join(OUTPUT_DIR, f"{task_key}_{case_name}_trial{trial+1}_log.csv")
 

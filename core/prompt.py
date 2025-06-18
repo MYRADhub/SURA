@@ -1442,7 +1442,6 @@ Grid (rows shown top-down)        Key
 
 But reverse the distances and obstacles and the result can flip.  
 **Always run the four-step checklist above; choose the assignment with the smaller longest path — even if that means taking the farther goal yourself.**
-
 ---
 
 ### ➍ Worked examples
@@ -1621,12 +1620,12 @@ Should Agent {agent_id} move **{direction}**?
 
 ### Instructions
 
-1. Only respond YES if the move brings you closer to your own goal and avoids danger.
-2. DO NOT move into obstacles or off the grid.
-3. DO NOT enter a goal cell that is assigned to another agent, even if it's closer.
-4. If another agent is nearby or heading to the same area, consider avoiding a collision.
-5. Use your declared goal to reason about where to go — you are committed to it unless a new plan is made.
-6. Do not block others if there’s a better route for the team.
+1. Only respond YES if the move brings you closer to your own goal.
+2. DO NOT enter a goal cell that is assigned to another agent, even if it's closer.
+3. If another agent is nearby or heading to the same area, consider avoiding a collision.
+4. Use your declared goal to reason about where to go — you are committed to it unless a new plan is made.
+5. Do not block others if there’s a better route for the team.
+6. Do not go away from your goal unless it’s necessary to avoid a collision or obstacle.
 
 Respond in the JSON format:
 ```json
