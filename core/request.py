@@ -117,7 +117,7 @@ def send_image_to_model_openai_logprobs(image_path, prompt, temperature=None):
     print('Sending request to OpenAI API')
 
     params = {
-        "model": "gpt-4o",
+        "model": "gpt-4.1",
         "messages": [
             {
                 "role": "user",
@@ -132,11 +132,11 @@ def send_image_to_model_openai_logprobs(image_path, prompt, temperature=None):
         ],
         "logprobs": True,
         "top_logprobs": 10,
-        "max_tokens": 100
+        # "max_tokens": 300
     }
     if temperature is not None:
         params["temperature"] = temperature
-        params["top_p"] = 0.0000001
+        # params["top_p"] = 0.0000001
 
     response = client.chat.completions.create(**params)
     print('Received response')
