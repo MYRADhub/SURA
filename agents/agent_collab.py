@@ -102,7 +102,7 @@ def select_target(
         distances=distances
     )
     time.sleep(0.5)
-    response, _ = send_image_to_model_openai_logprobs(image_path, prompt, temperature=0.0000001)
+    response, _ = send_image_to_model_openai_logprobs(image_path, prompt, model="gpt-4.1", temperature=0.0000001)
     print(f"Agent {agent_id} target selection response:\n{response}")
     target, explanation, reasoning = parse_target_response(response)
 
