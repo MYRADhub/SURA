@@ -1538,7 +1538,7 @@ def build_direction_selection_prompt(
         move_analysis_lines.append(f"  • {d:5} → (row {target[0]}, col {target[1]}) — visited {count} time(s)")
     move_analysis = "\n".join(move_analysis_lines)
 
-    # Calculate projected cell number
+    # Calculate projected (row, col) of the proposed move
     move_offsets = {
         'up': (1, 0),
         'down': (-1, 0),
@@ -1551,8 +1551,7 @@ def build_direction_selection_prompt(
         dr, dc = move_offsets[direction]
         target_pos = (r + dr, c + dc)
         if 0 <= target_pos[0] < grid_size and 0 <= target_pos[1] < grid_size:
-            cell_id = target_pos[0] * grid_size + target_pos[1]
-            move_label_line = f"If you move **{direction}**, you will arrive at cell **{cell_id}**."
+            move_label_line = f"If you move **{direction}**, you will arrive at cell **(row {target_pos[0]}, col {target_pos[1]})**."
         else:
             move_label_line = f"If you move **{direction}**, you would go out of bounds."
 
@@ -1589,8 +1588,8 @@ Your job now is to decide whether you should move **{direction}** to approach it
 
 Other agents are also choosing their moves. Coordination is important — do not walk into obstacles or other agents.  
 
-All empty cells are labeled with a gray number for orientation.  
-Cell numbers increase left to right, then row by row from bottom to top.  
+All empty cells are labeled with gray numbers in format (row,col) to assist reasoning.
+Bottom-left is (0,0), top-right is ({grid_size-1},{grid_size-1}).
 
 **Current state**  
 * Your position        … **(row {agent_pos[0]}, col {agent_pos[1]})**  
