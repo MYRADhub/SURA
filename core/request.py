@@ -187,6 +187,31 @@ def send_image_to_model_openai_logprobs_formatted(image_path, prompt, temperatur
     
     return sentence, logprobs
 
+def send_text_to_model_openai(prompt, model="gpt-4o", temperature=None):
+    load_dotenv()
+    api_key = os.getenv("OPENAI_API_KEY")
+    client = OpenAI(api_key=api_key)
+
+    print('Sending request to OpenAI API')
+    params = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "max_tokens": 100
+    }
+
+    if temperature is not None:
+        params["temperature"] = temperature
+        # params["top_p"] = 0.0000001
+
+    response = client.chat.completions.create(**params)
+    print('Received response')
+    return response.choices[0].message.content.strip()
+
 def build_test_prompt():
     # Example values for testing
     agent_id = 1
