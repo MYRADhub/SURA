@@ -43,3 +43,33 @@ def is_reachable(grid_size, start, goal, obstacles):
                     queue.append(neighbor)
     return False
 
+def select_direction_opt(agent_pos, declared_goal, goal_positions, env):
+    """
+    Select the direction that reduces the distance to the target goal the fastest.
+    """
+    if not declared_goal:
+        return None
+
+    goal_index = ord(declared_goal.upper()) - 65
+    if goal_index >= len(goal_positions) or goal_positions[goal_index] is None:
+        return None
+
+    target_goal = goal_positions[goal_index]
+    best_dir = None
+    best_dist = float('inf')
+
+    directions = {
+        "up": (1, 0),
+        "down": (-1, 0),
+        "left": (0, -1),
+        "right": (0, 1)
+    }
+
+    for dir_str, (dr, dc) in directions.items():
+        new_pos = (agent_pos[0] + dr, agent_pos[1] + dc)
+        if env.is_valid(new_pos):
+            dist = shortest_path_length(new_pos, target_goal, env)
+            if dist < best_dist:
+                best_dist = dist
+                best_dir = dir_str
+    return best_dir
