@@ -201,7 +201,7 @@ def send_text_to_model_openai(prompt, model="gpt-4o", temperature=None):
                 "content": prompt
             }
         ],
-        "max_tokens": 100
+        "max_tokens": 400
     }
 
     if temperature is not None:
@@ -210,7 +210,7 @@ def send_text_to_model_openai(prompt, model="gpt-4o", temperature=None):
 
     response = client.chat.completions.create(**params)
     print('Received response')
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content
 
 def build_test_prompt():
     # Example values for testing
