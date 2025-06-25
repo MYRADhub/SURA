@@ -5,10 +5,11 @@ from core.environment import GridWorld
 from core.prompt import (
     build_target_ranking_prompt,
     build_direction_selection_prompt,
+    build_negotiation_prompt
 )
-from core.request import send_image_to_model_openai_logprobs
+from core.request import send_image_to_model_openai_logprobs, send_text_to_model_openai
 from core.plot import plot_grid_unassigned_labeled
-from core.utils import shortest_path_length
+from core.utils import shortest_path_length, select_direction_opt
 from core.request import send_image_to_model_openai_logprobs
 import re
 
@@ -84,7 +85,7 @@ def select_target(
     step,
     distances
 ):
-    prompt = build_target_ranking_prompt(  # NEW FUNCTION
+    prompt = build_target_ranking_prompt(
         agent_id=agent_id,
         agent_pos=agent_pos,
         goal_positions=goal_positions,
@@ -99,7 +100,7 @@ def select_target(
     )
     time.sleep(0.5)
     response, _ = send_image_to_model_openai_logprobs(image_path, prompt, model="gpt-4.1", temperature=0.0000001)
-    print(f"Agent {agent_id} ranking response:\n{response}")
+    # print(f"Agent {agent_id} ranking response:\n{response}")
 
     ranking, explanation, reasoning = parse_ranking_response(response)
 
@@ -116,8 +117,7 @@ def select_target(
         if len(target_memory) > 5:
             target_memory[:] = target_memory[-5:]
 
-    return ranking, explanation
-
+    return ranking, explanation, reasoning
 
 def select_direction(
     agent_id,
@@ -166,41 +166,90 @@ def select_direction(
     best = max(scores, key=scores.get)
     move, explanation = explanations[best]
     print(f"Agent {agent_id} moves {best} toward goal {declared_goal}")
-    print(f"Explanation: {explanation}")
+    # print(f"Explanation: {explanation}")
 
     return best, explanation, logprobs_by_dir[best], scores
 
-def select_direction_opt(agent_pos, declared_goal, goal_positions, env):
-    """
-    Select the direction that reduces the distance to the target goal the fastest.
-    """
-    if not declared_goal:
-        return None
-
-    goal_index = ord(declared_goal.upper()) - 65
-    if goal_index >= len(goal_positions) or goal_positions[goal_index] is None:
-        return None
-
-    target_goal = goal_positions[goal_index]
-    best_dir = None
-    best_dist = float('inf')
-
-    directions = {
-        "up": (1, 0),
-        "down": (-1, 0),
-        "left": (0, -1),
-        "right": (0, 1)
+def run_negotiation(env, conflict_tuple, agent_ids, agent_positions, goal_positions, distances, agent_rankings, max_rounds=4):
+    print(f"\n--- Negotiation for conflict: {conflict_tuple} ---")
+    i, j, goal = conflict_tuple
+    id_i, id_j = agent_ids[i], agent_ids[j]
+    proposal = None
+    agent_targets = {
+        agent_ids[k]: agent_rankings[k][0] if agent_rankings[k] else None
+        for k in range(len(agent_ids))
+    }
+    filtered_agent_targets = {
+        aid: tgt
+        for aid, tgt in agent_targets.items()
+        if aid not in {id_i, id_j}
     }
 
-    for dir_str, (dr, dc) in directions.items():
-        new_pos = (agent_pos[0] + dr, agent_pos[1] + dc)
-        if env.is_valid(new_pos):
-            dist = shortest_path_length(new_pos, target_goal, env)
-            if dist < best_dist:
-                best_dist = dist
-                best_dir = dir_str
-    return best_dir
+    for round_number in range(1, max_rounds + 1):
+        # Agent i's turn
+        prompt_i = build_negotiation_prompt(
+            self_id=id_i,
+            self_pos=agent_positions[i],
+            opponent_id=id_j,
+            opponent_pos=agent_positions[j],
+            goal_positions=goal_positions,
+            distances=distances,
+            rankings={id_i: agent_rankings[i], id_j: agent_rankings[j]},
+            agent_targets=filtered_agent_targets,
+            conflicted_goal=goal,
+            previous_proposal=proposal,
+            round_number=round_number,
+            max_rounds=max_rounds
+        )
+        print(f"Agent {id_i} negotiation prompt:\n{prompt_i}")
+        response_i = send_text_to_model_openai(prompt_i, model="gpt-4.1", temperature=0.000001)
+        try:
+            parsed_i = json.loads(re.search(r"\{.*\}", response_i, re.DOTALL).group())
+        except:
+            print("⚠️ Failed to parse Agent", id_i)
+            return None
+        if parsed_i["action"] == "accept":
+            return parsed_i["proposal"]
+        elif parsed_i["action"] == "reject":
+            break
+        proposal = parsed_i["proposal"]
+        print(f"Agent {id_i} proposed: {proposal}")
 
+        # Agent j's turn
+        prompt_j = build_negotiation_prompt(
+            self_id=id_j,
+            self_pos=agent_positions[j],
+            opponent_id=id_i,
+            opponent_pos=agent_positions[i],
+            goal_positions=goal_positions,
+            distances=distances,
+            rankings={id_j: agent_rankings[j], id_i: agent_rankings[i]},
+            agent_targets=filtered_agent_targets,
+            conflicted_goal=goal,
+            previous_proposal=proposal,
+            round_number=round_number,
+            max_rounds=max_rounds
+        )
+        print(f"Agent {id_j} negotiation prompt:\n{prompt_j}")
+        response_j = send_text_to_model_openai(prompt_j, model="gpt-4.1", temperature=0.0001)
+        try:
+            parsed_j = json.loads(re.search(r"\{.*\}", response_j, re.DOTALL).group())
+        except:
+            print("⚠️ Failed to parse Agent", id_j)
+            return None
+        if parsed_j["action"] == "accept":
+            return parsed_j["proposal"]
+        elif parsed_j["action"] == "reject":
+            break
+        proposal = parsed_j["proposal"]
+        print(f"Agent {id_j} proposed: {proposal}")
+    if proposal:
+        print(f"Final proposal accepted: {proposal}")
+        return {f"Agent {id_i}": proposal, f"Agent {id_j}": proposal}
+    else:
+        print("No agreement reached.")
+
+    return None  # fallback if no agreement
 
 def run(
     image_path="data/grid.png",
@@ -229,11 +278,12 @@ def run(
     active = [True] * num_agents
     visits = [{} for _ in range(num_agents)]
     memories = [[] for _ in range(num_agents)]
-    target_memories = [[] for _ in range(num_agents)]  # memory of past target choices
+    target_memories = [[] for _ in range(num_agents)]
     target_goals = [None for _ in range(num_agents)]
     step = 0
     collisions = 0
     log_rows = []
+    agent_rankings = [[] for _ in range(num_agents)]
 
     total_opt = sum(
         min([shortest_path_length(start, g, env) for g in env.goals if g is not None], default=0)
@@ -248,8 +298,9 @@ def run(
         print(f"\n--- Step {step} ---")
         plot_grid_unassigned_labeled(env, image_path=image_path)
         proposals = agent_positions[:]
-        proposed_goals = target_goals[:]
+        proposed_goals = [None for _ in range(num_agents)]
 
+        # ----------- Phase 1: Ranking ----------
         for i in range(num_agents):
             if not active[i] or agent_positions[i] is None:
                 continue
@@ -257,6 +308,7 @@ def run(
             agent_id = agent_ids[i]
             agent_pos = agent_positions[i]
             visits[i][agent_pos] = visits[i].get(agent_pos, 0) + 1
+
             other_infos = [
                 (agent_ids[j], agent_positions[j])
                 for j in range(num_agents)
@@ -271,7 +323,7 @@ def run(
                 for j in range(num_agents)
             }
 
-            ranking = select_target(
+            ranking, _, _ = select_target(
                 agent_id=agent_id,
                 agent_pos=agent_pos,
                 goal_positions=env.goals,
@@ -286,12 +338,61 @@ def run(
                 step=step,
                 distances=distances
             )
+            agent_rankings[i] = ranking
 
-            new_target = ranking[0] if ranking else None
-            if new_target:
-                proposed_goals[i] = new_target
-                print(f"Agent {agent_id} top-ranked target: {new_target}")
+        # ----------- Phase 2: Conflict Resolution ----------
+        proposed_goals = [rank[0] if rank else None for rank in agent_rankings]
 
+        goal_to_agents = {}
+        for idx, tgt in enumerate(proposed_goals):
+            if active[idx] and tgt:
+                goal_to_agents.setdefault(tgt, []).append(idx)
+
+        conflict_pairs = [
+            (a1, a2, goal)
+            for goal, agents in goal_to_agents.items()
+            if len(agents) == 2
+            for a1, a2 in [tuple(sorted(agents))]
+        ]
+
+        print("Conflict pairs detected:", conflict_pairs)
+
+        for conflict in conflict_pairs:
+            resolution = run_negotiation(
+                env=env,
+                conflict_tuple=conflict,
+                agent_ids=agent_ids,
+                agent_positions=agent_positions,
+                goal_positions=env.goals,
+                distances={
+                    agent_ids[j]: [
+                        shortest_path_length(agent_positions[j], goal, env) if agent_positions[j] and goal else float("inf")
+                        for goal in env.goals
+                    ]
+                    for j in range(num_agents)
+                },
+                agent_rankings=agent_rankings
+            )
+            if resolution:
+                for aid_str, tgt in resolution.items():
+                    aid = int(aid_str.split()[-1])
+                    idx = agent_ids.index(aid)
+                    proposed_goals[idx] = tgt
+
+        # ----------- Phase 3: Direction Selection & Movement ----------
+        for i in range(num_agents):
+            if not active[i] or agent_positions[i] is None:
+                continue
+
+            agent_id = agent_ids[i]
+            agent_pos = agent_positions[i]
+            new_target = proposed_goals[i]
+
+            other_infos = [
+                (agent_ids[j], agent_positions[j])
+                for j in range(num_agents)
+                if j != i and agent_positions[j] is not None
+            ]
 
             best, explanation, logprobs, scores = select_direction(
                 agent_id=agent_id,
@@ -307,16 +408,10 @@ def run(
                 image_path=image_path,
                 env=env
             )
-            # best = select_direction_opt(agent_pos, new_target, env.goals, env)
-            # print(f"Agent {agent_id} selected direction: {best}")
-
 
             if best:
                 proposals[i] = env.move_agent(agent_pos, best)
-                print(f"Agent {agent_id} proposed move to {proposals[i]}")
-
                 top_goals = extract_top_goals(logprobs)
-
                 log_rows.append({
                     "step": step,
                     "agent_id": agent_id,
@@ -331,29 +426,26 @@ def run(
                     "goal_top2_logprob": f"{top_goals[1][1]:.5f}" if len(top_goals) > 1 else "",
                     "explanation": explanation,
                 })
-
                 memories[i].append((agent_pos[0], agent_pos[1], best, proposals[i][0], proposals[i][1]))
                 if len(memories[i]) > 5:
                     memories[i] = memories[i][-5:]
             else:
-                print(f"Agent {agent_id} has no valid moves and stays at {agent_pos}")
                 proposals[i] = agent_pos
 
         target_goals = proposed_goals[:]
 
-        # Collision resolution
+        # ----------- Collision Resolution ----------
         new_positions = proposals[:]
         for i in range(num_agents):
             for j in range(i + 1, num_agents):
                 if new_positions[i] == new_positions[j] and agent_positions[i] is not None and agent_positions[j] is not None:
                     collisions += 1
-                    print(f"Collision: Agent {agent_ids[i]} and Agent {agent_ids[j]} at {new_positions[i]}")
                     new_positions[j] = agent_positions[j]
 
         agent_positions = new_positions
         env.agents = agent_positions[:]
 
-        # Goal claiming
+        # ----------- Goal Claiming ----------
         to_remove = []
         claimed_goals = []
         for i in range(num_agents):
@@ -387,16 +479,6 @@ def run(
 
 
 if __name__ == "__main__":
-    # steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
-    steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
-    # steps, optimal, failed, collisions = run(
-    #     grid_size=8,
-    #     obstacles={(1, 0), (5, 5), (2, 3)},
-    #     agent_starts=[(0, 0), (1, 3)],
-    #     goal_positions=[(7, 7), (7, 5)],
-    #     num_agents=2,
-    #     image_path="data/agent_collab.png",
-    #     log_path="data/agent_collab_log.csv",
-    #     max_steps=30
-    # )
+    steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
+    # steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
     print(f"\n✅ Done!\nOptimal: {optimal}, Steps: {steps}, Failed: {failed}, Collisions: {collisions}")

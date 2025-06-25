@@ -1862,8 +1862,156 @@ Return **only** JSON:
 {{
   "reasoning": "Step-by-step thoughts: consider agent distances, conflicts, tradeoffs, and explain your decision path.",
   "explanation": "One or two sentence summary of your final goal choice.",
-  "target": "Ranked list from most to least preferred goal (e.g., [B, A, C])"
+  "ranking": "Ranked list from most to least preferred goal (e.g., [B, A, C])"
 }}
 ````
 
 """
+
+import json
+
+def build_negotiation_prompt(
+    self_id: int,
+    self_pos: tuple[int, int],
+    opponent_id: int,
+    opponent_pos: tuple[int, int],
+    goal_positions: list[tuple[int, int]],
+    distances: dict[int, list[int]],  # e.g., {1: [3,5,2], 2: [4,2,3]}
+    rankings: dict[int, list[str]],   # e.g., {1: ['A','B','C'], 2: ['B','A','C']}
+    agent_targets: dict[int, str | None],  # e.g., {1: 'A', 2: 'B', 3: None}
+    conflicted_goal: str,            # e.g., 'A'
+    previous_proposal: dict | None,  # or {} if first turn
+    round_number: int,
+    max_rounds: int = 4,
+) -> str:
+    # Format goal locations
+    goal_lines = []
+    for i, pos in enumerate(goal_positions):
+        if pos:
+            goal_lines.append(f"• Goal {chr(65+i)}: (row {pos[0]}, col {pos[1]})")
+    formatted_goal_locations = "\n".join(goal_lines)
+
+    # Format distance table
+    dist_lines = []
+    for aid in [self_id, opponent_id]:
+        line = f"• Agent {aid}: " + ", ".join(
+            f"{chr(65+i)} = {d if d != float('inf') else '∞'}"
+            for i, d in enumerate(distances[aid])
+        )
+        dist_lines.append(line)
+    formatted_distances = "\n".join(dist_lines)
+
+    # Declared current targets
+    target_lines = []
+    for aid, tgt in sorted(agent_targets.items()):
+        tgt_disp = tgt if tgt else "none"
+        target_lines.append(f"• Agent {aid} → Goal {tgt_disp}")
+    declared_targets_block = "\n".join(target_lines)
+
+    # Format rankings
+    self_ranks = rankings[self_id]
+    opp_ranks = rankings[opponent_id]
+
+    # Handle prior proposal section
+    if previous_proposal is None:
+        proposal_section = (
+            "There is no proposal yet. It is your turn to initiate.\n\n"
+            "🎯 Please propose a unique goal assignment (one for you, one for your opponent) "
+            "that minimizes the longest distance among the two of you."
+        )
+    else:
+        formatted_proposal = json.dumps(previous_proposal, indent=2)
+        proposal_section = (
+            f"Agent {opponent_id} previously proposed:\n\n"
+            f"```json\n{formatted_proposal}\n```\n\n"
+            f"It is now your turn to respond. You may accept, counter, or reject."
+        )
+
+    prompt = f"""
+**🧠 Negotiation Mode: Conflict Resolution between LLM Agents**
+
+You are Agent {self_id} (🔵 blue circle with number {self_id}) on a shared grid environment.  
+You are negotiating with Agent {opponent_id} to resolve a **goal conflict**.  
+Each agent must end up with exactly one unique goal (A, B, C, …). No two agents can pursue the same goal.
+
+Your objective is to **minimize the number of timesteps until all agents reach their goals**.  
+This cost is defined as the **maximum number of steps** any agent must take to reach their assigned goal.
+
+---
+
+**🎯 Goals**
+
+{formatted_goal_locations}
+
+**📍 Agent Positions**
+
+• You (Agent {self_id}): (row {self_pos[0]}, col {self_pos[1]})  
+• Agent {opponent_id}: (row {opponent_pos[0]}, col {opponent_pos[1]})
+
+**📊 Agent-to-Goal Distances (in steps)**
+
+{formatted_distances}
+
+**🎯 Declared Current Targets**
+
+{declared_targets_block}
+
+**🧩 Ranked Preferences**
+
+• Your preferences: {self_ranks}  
+• Opponent's preferences: {opp_ranks}
+
+---
+
+**🤝 Conflict Summary**
+
+You and Agent {opponent_id} both ranked **Goal {conflicted_goal}** as your top choice.  
+You must now negotiate to decide who gets which goal.
+
+Each agent should receive exactly one **unique** goal.  
+You should collaboratively select an assignment that minimizes the **maximum path length** between both of you.
+
+---
+
+**🗣️ Negotiation Round {round_number}/{max_rounds}**
+
+{proposal_section}
+
+---
+
+### 🎭 Your Role
+
+Act from the perspective of **Agent {self_id}**, advocating reasonably for a goal assignment that is both team-optimal and fair.  
+You may choose to:
+
+• **accept** the previous proposal  
+• **counter** with a new proposal  
+• **reject** if you believe no compromise is acceptable
+
+If countering, propose an assignment that:
+- Gives each agent a **different** goal
+- Minimizes the **maximum distance**
+- Justifies why this choice is better than the previous one
+
+---
+
+### 🔒 Rules & Reminders
+
+• Each goal can only be assigned to one agent.
+• You may not assign a goal to yourself if it’s much better for the other agent.
+• Favor team performance over personal greed.
+• You may express disagreement, but remain cooperative and strategic.
+
+Respond only in valid JSON. Use Chain-of-Thought to reason before giving your final assignment.
+
+You must respond using the following JSON structure:
+
+```json
+{{
+"proposal": {{"Agent {self_id}": "X", "Agent {opponent_id}": "Y"}},
+"action": "accept" | "counter" | "reject",
+"justification": "(Explain clearly why this assignment is good. Use distances, fairness, or fallback plans.)"
+}}
+````
+"""
+    return prompt.strip()
