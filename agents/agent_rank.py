@@ -201,7 +201,7 @@ def run_negotiation(env, conflict_tuple, agent_ids, agent_positions, goal_positi
             round_number=round_number,
             max_rounds=max_rounds
         )
-        print(f"Agent {id_i} negotiation prompt:\n{prompt_i}")
+        print(f"Agent {id_i} negotiation prompt:\n{prompt_i[:100]}...")  # Print first 100 chars for brevity
         response_i = send_text_to_model_openai(prompt_i, model="gpt-4.1", temperature=0.000001)
         try:
             parsed_i = json.loads(re.search(r"\{.*\}", response_i, re.DOTALL).group())
@@ -230,7 +230,7 @@ def run_negotiation(env, conflict_tuple, agent_ids, agent_positions, goal_positi
             round_number=round_number,
             max_rounds=max_rounds
         )
-        print(f"Agent {id_j} negotiation prompt:\n{prompt_j}")
+        print(f"Agent {id_j} negotiation prompt:\n{prompt_j[:100]}...")  # Print first 100 chars for brevity
         response_j = send_text_to_model_openai(prompt_j, model="gpt-4.1", temperature=0.0001)
         try:
             parsed_j = json.loads(re.search(r"\{.*\}", response_j, re.DOTALL).group())
@@ -479,6 +479,6 @@ def run(
 
 
 if __name__ == "__main__":
-    steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
-    # steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
+    # steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
+    steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
     print(f"\n✅ Done!\nOptimal: {optimal}, Steps: {steps}, Failed: {failed}, Collisions: {collisions}")

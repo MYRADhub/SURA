@@ -1830,6 +1830,11 @@ Your ranking should consider:
 - Which assignments minimize the **maximum** path.
 - Reasonable fallback options in case of conflict.
 
+Even if you are only 1 step away from a goal, that doesn't necessarily mean you should choose it.
+Sometimes it is better to let another agent take a closer goal if it leads to a shorter total
+And even if you are further to a goal than another agent, it might be better for you to take that goal if it leads to a shorter total time for the team.
+Do not be a pushover, but also do not be too selfish. Think about the team and how to minimize the total number of simulation steps.
+
 ---
 
 **Current state**  
@@ -1847,9 +1852,6 @@ Your ranking should consider:
 
 **Previous target selections**  
 {past_targets_lines}
-
-**Agent-to-Goal Distances (in steps)**  
-{distance_block}
 
 ---
 
