@@ -12,6 +12,7 @@ from core.plot import plot_grid_unassigned_labeled
 from core.utils import shortest_path_length, select_direction_opt
 from core.request import send_image_to_model_openai_logprobs
 import re
+import argparse
 
 def extract_yes_logprob(logprobs):
     if not logprobs:
@@ -479,6 +480,9 @@ def run(
 
 
 if __name__ == "__main__":
-    # steps, optimal, failed, collisions = run(config_path="configs/case_9_2_greedy_agents.yaml")
-    steps, optimal, failed, collisions = run(config_path="configs/case_10_insane.yaml")
+    parser = argparse.ArgumentParser(description="Run agent rank simulation.")
+    parser.add_argument("--config", type=str, default="configs/case_10_insane.yaml", help="Path to config YAML file")
+    args = parser.parse_args()
+
+    steps, optimal, failed, collisions = run(config_path=args.config)
     print(f"\n✅ Done!\nOptimal: {optimal}, Steps: {steps}, Failed: {failed}, Collisions: {collisions}")
