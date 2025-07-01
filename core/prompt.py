@@ -1879,26 +1879,31 @@ def build_negotiation_prompt(
     opponent_pos: tuple[int, int],
     goal_positions: list[tuple[int, int]],
     distances: dict[int, list[int]],  # e.g., {1: [3,5,2], 2: [4,2,3]}
-    rankings: dict[int, list[str]],   # e.g., {1: ['A','B','C'], 2: ['B','A','C']}
+    rankings: dict[int, list[str]],   # e.g., {1: ['A','B'], 2: ['B','A']}
     agent_targets: dict[int, str | None],  # e.g., {1: 'A', 2: 'B', 3: None}
     conflicted_goal: str,            # e.g., 'A'
     previous_proposal: dict | None,  # or {} if first turn
     round_number: int,
     max_rounds: int = 4,
 ) -> str:
+    # Determine unique goals under negotiation
+    all_goals = list(sorted(set(rankings[self_id] + rankings[opponent_id])))
+    goal_indices = [ord(g) - 65 for g in all_goals]
+
     # Format goal locations
     goal_lines = []
-    for i, pos in enumerate(goal_positions):
+    for i in goal_indices:
+        pos = goal_positions[i]
         if pos:
             goal_lines.append(f"• Goal {chr(65+i)}: (row {pos[0]}, col {pos[1]})")
     formatted_goal_locations = "\n".join(goal_lines)
 
-    # Format distance table
+    # Format distance table only for these goals
     dist_lines = []
     for aid in [self_id, opponent_id]:
         line = f"• Agent {aid}: " + ", ".join(
-            f"{chr(65+i)} = {d if d != float('inf') else '∞'}"
-            for i, d in enumerate(distances[aid])
+            f"{chr(65+i)} = {distances[aid][i] if distances[aid][i] != float('inf') else '∞'}"
+            for i in goal_indices
         )
         dist_lines.append(line)
     formatted_distances = "\n".join(dist_lines)
@@ -1941,7 +1946,7 @@ This cost is defined as the **maximum number of steps** any agent must take to r
 
 ---
 
-**🎯 Goals**
+**🎯 Goals Under Negotiation**
 
 {formatted_goal_locations}
 
@@ -1950,7 +1955,7 @@ This cost is defined as the **maximum number of steps** any agent must take to r
 • You (Agent {self_id}): (row {self_pos[0]}, col {self_pos[1]})  
 • Agent {opponent_id}: (row {opponent_pos[0]}, col {opponent_pos[1]})
 
-**📊 Agent-to-Goal Distances (in steps)**
+**📊 Distances to These Goals**
 
 {formatted_distances}
 
@@ -1958,10 +1963,17 @@ This cost is defined as the **maximum number of steps** any agent must take to r
 
 {declared_targets_block}
 
-**🧩 Ranked Preferences**
+**🧩 Top 2 Ranked Preferences (Negotiation Restricted to These)**
 
 • Your preferences: {self_ranks}  
 • Opponent's preferences: {opp_ranks}
+
+---
+
+**⚠️ Allowed Choices**
+
+You may only assign each agent a goal from this list:
+{all_goals}
 
 ---
 
@@ -1970,7 +1982,7 @@ This cost is defined as the **maximum number of steps** any agent must take to r
 You and Agent {opponent_id} both ranked **Goal {conflicted_goal}** as your top choice.  
 You must now negotiate to decide who gets which goal.
 
-Each agent should receive exactly one **unique** goal.  
+Each agent should receive exactly one **unique** goal **from your combined top 2 preferences**.  
 You should collaboratively select an assignment that minimizes the **maximum path length** between both of you.
 
 ---
@@ -1992,6 +2004,7 @@ You may choose to:
 
 If countering, propose an assignment that:
 - Gives each agent a **different** goal
+- Chooses only among the allowed goals listed above
 - Minimizes the **maximum distance**
 - Justifies why this choice is better than the previous one
 
@@ -2000,6 +2013,7 @@ If countering, propose an assignment that:
 ### 🔒 Rules & Reminders
 
 • Each goal can only be assigned to one agent.
+• You may **only** choose from the goals listed above.
 • You may not assign a goal to yourself if it’s much better for the other agent.
 • Favor team performance over personal greed.
 • You may express disagreement, but remain cooperative and strategic.
@@ -2015,5 +2029,6 @@ You must respond using the following JSON structure:
 "justification": "(Explain clearly why this assignment is good. Use distances, fairness, or fallback plans.)"
 }}
 ````
+
 """
     return prompt.strip()
