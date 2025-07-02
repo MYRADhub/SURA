@@ -186,7 +186,10 @@ def run_negotiation(env, conflict_tuple, agent_ids, agent_positions, goal_positi
     # Build reduced distances dict
     reduced_distances = {}
     for aid, idx in zip([id_i, id_j], [i, j]):
-        reduced_distances[aid] = [distances[aid][k] for k in allowed_indices]
+        reduced_distances[aid] = [
+            (chr(65 + k), distances[aid][k]) for k in allowed_indices
+        ]
+
 
     # Build reduced rankings dict
     reduced_rankings = {

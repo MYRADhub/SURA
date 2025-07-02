@@ -1902,10 +1902,11 @@ def build_negotiation_prompt(
     dist_lines = []
     for aid in [self_id, opponent_id]:
         line = f"• Agent {aid}: " + ", ".join(
-            f"{chr(65+i)} = {distances[aid][i] if distances[aid][i] != float('inf') else '∞'}"
-            for i in goal_indices
+            f"{goal} = {dist if dist != float('inf') else '∞'}"
+            for (goal, dist) in distances[aid]
         )
         dist_lines.append(line)
+
     formatted_distances = "\n".join(dist_lines)
 
     # Declared current targets
