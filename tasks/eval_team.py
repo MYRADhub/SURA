@@ -20,6 +20,7 @@ TASKS = [
     ("agent_com_unstruc", "agents.agent_com_unstruc"),
     ("agent_collab", "agents.agent_collab"),
     ("agent_rank", "agents.agent_rank"),
+    ("agent_rank_top2", "agents.agent_rank_top2"),
 ]
 
 # Shared obstacle layout (no overlaps)
