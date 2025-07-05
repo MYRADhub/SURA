@@ -1492,7 +1492,7 @@ Return **only** JSON:
   "explanation": "One or two sentence summary of your final goal choice.",
   "target": "Goal letter (e.g., A, B, C)"
 }}
-````
+```
 
 """
 
@@ -1866,7 +1866,7 @@ Return **only** JSON:
   "explanation": "One or two sentence summary of your final goal choice.",
   "ranking": "Ranked list from most to least preferred goal (e.g., [B, A, C])"
 }}
-````
+```
 
 """
 
@@ -2029,7 +2029,6 @@ You must respond using the following JSON structure:
 "action": "accept" | "counter" | "reject",
 "justification": "(Explain clearly why this assignment is good. Use distances, fairness, or fallback plans.)"
 }}
-````
-
+```
 """
     return prompt.strip()
