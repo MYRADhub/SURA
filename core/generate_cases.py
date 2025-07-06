@@ -2,7 +2,7 @@ import random
 import yaml
 import os
 
-def generate_case(case_num, grid_size=25, min_agents=2, max_agents=6, min_obstacles=15, max_obstacles=30):
+def generate_case(case_num, grid_size=20, min_agents=2, max_agents=6, min_obstacles=15, max_obstacles=30):
     num_agents = random.randint(min_agents, max_agents)
     num_obstacles = random.randint(min_obstacles, max_obstacles)
 
