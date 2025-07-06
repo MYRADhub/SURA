@@ -99,9 +99,13 @@ def select_target(
         target_memory=target_memory,
         distances=distances
     )
+    # with open("debug_prompt.txt", "w") as f:
+    #     f.write(prompt)
+    # # stop the program here to inspect the prompt
+    # input("Press Enter to continue...")
     time.sleep(0.5)
     response, _ = send_image_to_model_openai_logprobs(image_path, prompt, model="gpt-4.1", temperature=0.0000001)
-    # print(f"Agent {agent_id} ranking response:\n{response}")
+    print(f"Agent {agent_id} ranking response:\n...{response[-200:]}")
 
     ranking, explanation, reasoning = parse_ranking_response(response)
 
@@ -225,7 +229,12 @@ def run_negotiation(env, conflict_tuple, agent_ids, agent_positions, goal_positi
             max_rounds=max_rounds
         )
         print(f"Agent {id_i} negotiation prompt:\n{prompt_i[:200]}...")
-        response_i = send_text_to_model_openai(prompt_i, model="gpt-4.1", temperature=0.00001)
+        # save the prompt to a file for debugging
+        # with open("debug_prompt.txt", "w") as f:
+        #     f.write(prompt_i)
+        # # stop the program here to inspect the prompt
+        # input("Press Enter to continue...")
+        response_i = send_text_to_model_openai(prompt_i, model="gpt-4.1", temperature=0.0000001)
         try:
             parsed_i = json.loads(re.search(r"\{.*\}", response_i, re.DOTALL).group())
         except:
@@ -254,7 +263,7 @@ def run_negotiation(env, conflict_tuple, agent_ids, agent_positions, goal_positi
             max_rounds=max_rounds
         )
         print(f"Agent {id_j} negotiation prompt:\n{prompt_j[:200]}...")
-        response_j = send_text_to_model_openai(prompt_j, model="gpt-4.1", temperature=0.00001)
+        response_j = send_text_to_model_openai(prompt_j, model="gpt-4.1", temperature=0.0000001)
         try:
             parsed_j = json.loads(re.search(r"\{.*\}", response_j, re.DOTALL).group())
         except:
@@ -503,7 +512,7 @@ def run(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run agent rank simulation.")
-    parser.add_argument("--config", type=str, default="configs/case_10_insane.yaml", help="Path to config YAML file")
+    parser.add_argument("--config", type=str, default="configs/difficult/case_10_insane.yaml", help="Path to config YAML file")
     args = parser.parse_args()
 
     steps, optimal, failed, collisions = run(config_path=args.config)

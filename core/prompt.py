@@ -1490,7 +1490,7 @@ Return **only** JSON:
 {{
   "reasoning": "Step-by-step thoughts: consider agent distances, conflicts, tradeoffs, and explain your decision path.",
   "explanation": "One or two sentence summary of your final goal choice.",
-  "target": "Goal letter (e.g., A, B, C)"
+  "target": "Goal letter (e.g., A, B, C, without any back slashes)"
 }}
 ```
 
@@ -1764,7 +1764,8 @@ If two black squares touch only at a corner, a thick black diagonal bar is drawn
 2. **Greedy ≠ optimal**: sometimes you must pick a farther goal so another agent can finish sooner.  
 3. **Don’t be a pushover**: if you’re clearly the best-placed agent for a goal, keep it unless switching lowers total cost.  
 4. Use relative distances, obstacles, and potential path conflicts to decide.
-5. Try to think of different assignments and their longest paths and then evaluate which one is the best for you and the team, do not get stuck on one assignment and its explanation.
+5. Try to think of different assignments and their longest paths and then evaluate which one is the best for you and the team, do not get stuck on one assignment an its explanation.
+6. Carefully calculate the full DETAILED step-by-step path length for each agent-goal pair, including all detours around obstacles. Calculate cell-by-cell path analysis using the visual map. RELY ON THE IMAGE MORE.
 
 ---
 
@@ -1835,6 +1836,13 @@ Sometimes it is better to let another agent take a closer goal if it leads to a 
 And even if you are further to a goal than another agent, it might be better for you to take that goal if it leads to a shorter total time for the team.
 Do not be a pushover, but also do not be too selfish. Think about the team and how to minimize the total number of simulation steps.
 
+The team's total cost is always defined by the agent who finishes last. Always consider alternative assignments: sometimes it's better for an agent to take a slightly farther goal so that another agent avoids a much longer route, even if it means someone gets a non-nearest goal.
+
+For at least two possible ways to assign agents to goals (not just by nearest), list the resulting maximum path length for each assignment. Pick the assignment that minimizes the maximum path length, and only then choose your preferred goal.
+
+For every assignment, check if swapping your choice with another agent's leads to a lower maximum path length.
+
+Rank goals for yourself in order of which assignment leads to the lowest maximum team finish time, not by your own shortest path.
 ---
 
 **Current state**  
@@ -1864,10 +1872,9 @@ Return **only** JSON:
 {{
   "reasoning": "Step-by-step thoughts: consider agent distances, conflicts, tradeoffs, and explain your decision path.",
   "explanation": "One or two sentence summary of your final goal choice.",
-  "ranking": "Ranked list from most to least preferred goal (e.g., [B, A, C])"
+  "ranking": Ranked list from most to least preferred goal (e.g., ["B", "A", “C”] or [“A”, “D”, “B”, “C”], without any back slashes, without spaces at start and end of the list, without quotes around the list). DO NOT SAY “[B, A, C]” or [ “B”, “A”, “C” ] or [B, A, C], you have to have quotes around the letters for the correct parsing, BUT YOU CAN SAY [“B”, “A”, “C”]
 }}
 ```
-
 """
 
 import json
