@@ -28,16 +28,16 @@ obstacles = {(3, 3), (4, 4), (2, 5), (5, 2), (6, 6)}
 
 # Hand-crafted coordination scenarios
 cases = {
-    "case_1": "configs/case_1_local_greed.yaml",
-    "case_2": "configs/case_2_decoy_efficiency.yaml",
-    "case_3": "configs/case_3_one_stays_back.yaml",
-    "case_4": "configs/case_4_tight_corridor.yaml",
-    "case_5": "configs/case_5_decoy_ignored.yaml",
-    "case_6": "configs/case_6_lane_assignment.yaml",
-    "case_7": "configs/case_7_vertical_choke.yaml",
-    "case_8": "configs/case_8_goal_stealing.yaml",
-    "case_9": "configs/case_9_2_greedy_agents.yaml",
-    "case_10": "configs/case_10_insane.yaml"
+    "case_1": "configs/difficult/case_1_local_greed.yaml",
+    "case_2": "configs/difficult/case_2_decoy_efficiency.yaml",
+    "case_3": "configs/difficult/case_3_one_stays_back.yaml",
+    "case_4": "configs/difficult/case_4_tight_corridor.yaml",
+    "case_5": "configs/difficult/case_5_decoy_ignored.yaml",
+    "case_6": "configs/difficult/case_6_lane_assignment.yaml",
+    "case_7": "configs/difficult/case_7_vertical_choke.yaml",
+    "case_8": "configs/difficult/case_8_goal_stealing.yaml",
+    "case_9": "configs/difficult/case_9_2_greedy_agents.yaml",
+    "case_10": "configs/difficult/case_10_insane.yaml"
 }
 
 def evaluate_team(task_key, run_fn):
