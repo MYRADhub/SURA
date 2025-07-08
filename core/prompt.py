@@ -1861,6 +1861,9 @@ Rank goals for yourself in order of which assignment leads to the lowest maximum
 **Previous target selections**  
 {past_targets_lines}
 
+**Agent-to-Goal Distances (in steps)**
+{distance_block}
+
 ---
 
 ### Question
@@ -1908,9 +1911,10 @@ def build_negotiation_prompt(
     # Format distance table only for these goals
     dist_lines = []
     for aid in [self_id, opponent_id]:
+        agent_distances = distances[aid]
         line = f"• Agent {aid}: " + ", ".join(
-            f"{goal} = {dist if dist != float('inf') else '∞'}"
-            for (goal, dist) in distances[aid]
+            f"{goal} = {agent_distances[ord(goal) - 65] if agent_distances[ord(goal) - 65] != float('inf') else '∞'}"
+            for goal in all_goals
         )
         dist_lines.append(line)
 
