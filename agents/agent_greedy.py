@@ -8,7 +8,12 @@ def compute_greedy_rankings(env):
     rankings = []
     for agent_pos in env.agents:
         dists = []
+        if agent_pos is None:
+            rankings.append([])
+            continue
         for idx, goal_pos in enumerate(env.goals):
+            if goal_pos is None:
+                continue
             dist = shortest_path_length(agent_pos, goal_pos, env)
             dists.append((dist, idx))
         dists.sort()
