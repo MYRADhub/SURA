@@ -217,7 +217,11 @@ def plot_grid_unassigned_labeled(env: GridWorld, image_path="data/grid_labeled.p
     ax.set_yticklabels([f"row {i}" for i in range(env.size)])
     ax.tick_params(axis='both', which='both', length=0)
 
-    # --- NEW: label empty cells with "row,col" ---
+    # --- NEW: label empty cells with "001", "002", ... padded to total digits ---
+    total_cells = env.size * env.size
+    num_digits = len(str(total_cells))
+    cell_counter = 1
+
     for r in range(env.size):
         for c in range(env.size):
             pos = (r, c)
@@ -234,9 +238,11 @@ def plot_grid_unassigned_labeled(env: GridWorld, image_path="data/grid_labeled.p
             if label:       # Agent / goal / obstacle
                 ax.text(c + 0.5, r + 0.5, label,
                         color="white", fontsize=12, ha='center', va='center', weight='bold')
-            else:           # Empty cell → show "row,col"
-                ax.text(c + 0.5, r + 0.5, f"{r},{c}",
+            else:           # Empty cell → show padded number
+                padded_num = str(cell_counter).zfill(num_digits)
+                ax.text(c + 0.5, r + 0.5, padded_num,
                         color="gray", fontsize=8, ha='center', va='center', alpha=0.6)
+            cell_counter += 1
 
     # Border directions
     margin = 0.5

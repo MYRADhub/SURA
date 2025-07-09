@@ -1722,8 +1722,8 @@ Your objective is to **minimise this total cost**, not merely your own distance.
 **Grid layout**  
 • The world is a square {grid_size} × {grid_size} grid.  
 • **Coordinates are zero-indexed**: (row 0, col 0) is the *bottom-left*; (row {grid_size-1}, col {grid_size-1}) is the *top-right*.  
-• Each empty cell shows its coordinate in light-grey text – formatted “row,col” (e.g. `02,05` means row 2, col 5).  
-• Horizontal rows are numbered upward; vertical columns numbered left→right.  
+• Each empty cell shows its index in light-grey text that is a number (e.g. `012` means cell 12).  
+• The numbers increase from left to right and from bottom to top.  
 
 **Cell types & colours**  
 | Colour / glyph | Meaning | Example label | Notes |  
