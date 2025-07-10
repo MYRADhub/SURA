@@ -11,6 +11,7 @@ from core.utils import shortest_path_length, select_direction_opt
 from core.request import send_image_to_model_openai_logprobs
 import re
 import argparse
+import random
 
 def parse_ranking_response(text):
     try:
@@ -78,24 +79,38 @@ def select_target(
     )
     time.sleep(0.5)
     response, _ = send_image_to_model_openai_logprobs(image_path, prompt, model="gpt-4.1", temperature=0.0000001)
-    # print(f"Agent {agent_id} ranking response:\n{response}")
 
-    ranking, explanation, reasoning = parse_ranking_response(response)
+    raw_ranking, explanation, reasoning = parse_ranking_response(response)
 
-    if ranking:
-        print(f"Agent {agent_id} ranking: {ranking}")
+    # Filter invalid goals
+    valid_goals = set(chr(65 + i) for i in range(len(goal_positions)) if goal_positions[i] is not None)
+    seen = set()
+    filtered_ranking = []
+
+    for g in raw_ranking:
+        if g in valid_goals and g not in seen:
+            filtered_ranking.append(g)
+            seen.add(g)
+
+    # Fallback: choose random goal if nothing valid
+    if not filtered_ranking and valid_goals:
+        fallback = random.choice(list(valid_goals))
+        filtered_ranking = [fallback]
+        print(f"⚠️ Agent {agent_id} had no valid ranking. Random fallback: {fallback}")
+
+    print(f"Agent {agent_id} ranking: {filtered_ranking}")
     if reasoning:
         print(f"Reasoning: {reasoning}")
     if explanation:
         print(f"Summary: {explanation}")
 
-    if ranking:
-        top = ranking[0]
+    if filtered_ranking:
+        top = filtered_ranking[0]
         target_memory.append((step, top, explanation))
         if len(target_memory) > 5:
             target_memory[:] = target_memory[-5:]
 
-    return ranking, explanation, reasoning
+    return filtered_ranking, explanation, reasoning
 
 def resolve_conflicts(agent_rankings, active_agents):
     final_goals = [rank[0] if rank else None for rank in agent_rankings]
