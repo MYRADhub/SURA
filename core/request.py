@@ -24,7 +24,7 @@ def send_image_to_model_ollama(image_path, prompt):
     return (prompt, response['message']['content'].strip().lower())
 
 def send_image_to_model_openai_responses_api(image_path, prompt, temperature=None):
-    load_dotenv()
+    load_dotenv(override=True)
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
     
@@ -72,7 +72,7 @@ def send_image_to_model_openai_responses_api(image_path, prompt, temperature=Non
     return response.output_text.strip().lower()
 
 def send_image_to_model_openai(image_path, prompt, temperature=None):
-    load_dotenv()
+    load_dotenv(override=True)
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
     
@@ -107,7 +107,7 @@ def send_image_to_model_openai(image_path, prompt, temperature=None):
     return response.choices[0].message.content.strip().lower()
 
 def send_image_to_model_openai_logprobs(image_path, prompt, model="gpt-4o", temperature=None):
-    load_dotenv()
+    load_dotenv(override=True)
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
     
@@ -148,7 +148,7 @@ def send_image_to_model_openai_logprobs(image_path, prompt, model="gpt-4o", temp
     return sentence, logprobs
 
 def send_image_to_model_openai_logprobs_formatted(image_path, prompt, temperature=None):
-    load_dotenv()
+    load_dotenv(override=True)
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
 
@@ -188,7 +188,7 @@ def send_image_to_model_openai_logprobs_formatted(image_path, prompt, temperatur
     return sentence, logprobs
 
 def send_text_to_model_openai(prompt, model="gpt-4o", temperature=None):
-    load_dotenv()
+    load_dotenv(override=True)
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
 
