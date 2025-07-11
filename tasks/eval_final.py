@@ -86,23 +86,56 @@ if __name__ == "__main__":
     parser.add_argument("--agents", type=str, choices=[t[0] for t in TASKS], nargs="+", default=[t[0] for t in TASKS])
     parser.add_argument("--config-dir", type=str, default="configs/difficult", help="Directory containing configuration YAML files")
     parser.add_argument("--visualize", action="store_true", help="Save visualizations for each scenario")
-
     args = parser.parse_args()
+
     VISUALIZE = args.visualize
-    # Extract cases from the specified config directory (all files from the directory ending with .yaml)
-    cases = {}
-    for filename in os.listdir(args.config_dir):
-        if filename.endswith(".yaml"):
-            case_name = os.path.splitext(filename)[0]
-            cases[case_name] = os.path.join(args.config_dir, filename)
+
+    # Load all YAML cases
+    cases = {
+        os.path.splitext(f)[0]: os.path.join(args.config_dir, f)
+        for f in os.listdir(args.config_dir)
+        if f.endswith(".yaml")
+    }
     if not cases:
         raise ValueError(f"No YAML files found in directory: {args.config_dir}")
+
     print(f"Found {len(cases)} cases in {args.config_dir}")
-    # Print first 10 cases for debugging
     print("Cases:", list(cases.keys())[:10])
 
+    # Prepare mapping of selected agents
     selected_agents = {key: mod for (key, mod) in TASKS if key in args.agents}
+
+    # Load completed trials for each agent
+    completed = {key: set() for key in selected_agents}
+    for key in selected_agents:
+        log_path = os.path.join(OUTPUT_DIR, f"{key}_team_results.csv")
+        if os.path.exists(log_path):
+            with open(log_path, newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    completed[key].add((row["Case"], int(row["Trial"])))
+
+    print("Completed trials for agents:")
+    for key, trials in completed.items():
+        print(f"{key}: {len(trials)} trials")
+
+    input("Found completed trials for agents. Press Enter to continue...")
+
+    # Run evaluation for each agent
     for key, module_path in selected_agents.items():
+        # Filter out cases where all trials are done (trial 1 and 2)
+        agent_cases = {
+            case: path
+            for case, path in cases.items()
+            if (case, 1) not in completed[key] or (case, 2) not in completed[key]
+        }
+
+        print(f"\n{key} has {len(agent_cases)} cases left to run.")
+        if not agent_cases:
+            print(f"✅ Skipping {key} — all trials completed.")
+            continue
+
         module = importlib.import_module(module_path)
         run_fn = module.run
-        evaluate_team(key, run_fn, cases=cases)
+        evaluate_team(key, run_fn, cases=agent_cases)
+
