@@ -2,6 +2,7 @@ import argparse
 import csv
 from core.environment import GridWorld
 from core.utils import shortest_path_length, select_direction_opt
+import os
 
 def compute_greedy_rankings(env):
     """For each agent, sort goals by ascending distance."""
@@ -140,8 +141,35 @@ def run(config_path, log_path="data/greedy_log.csv", max_steps=50):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run centralized greedy agent.")
-    parser.add_argument("--config", type=str, required=True, help="Path to config YAML file")
+    parser.add_argument("--config", type=str, help="Path to a single config YAML file")
+    parser.add_argument("--configs-dir", type=str, help="Directory containing multiple YAML config files")
+    parser.add_argument("--log-dir", type=str, default="results_greedy", help="Where to store CSV logs")
     args = parser.parse_args()
 
-    steps, optimal, failed, collisions = run(config_path=args.config)
-    print(f"\n📊 Greedy Results:\nOptimal: {optimal}\nSteps: {steps}\nFailed: {failed}\nCollisions: {collisions}")
+    # Check for correct usage
+    if bool(args.config) == bool(args.configs_dir):  # both set or both unset
+        raise ValueError("You must provide exactly one of --config or --configs-dir.")
+
+    os.makedirs(args.log_dir, exist_ok=True)
+
+    if args.config:
+        steps, optimal, failed, collisions = run(config_path=args.config)
+        print(f"\n📊 Greedy Results:\nOptimal: {optimal}\nSteps: {steps}\nFailed: {failed}\nCollisions: {collisions}")
+    else:
+        summary_path = os.path.join(args.log_dir, "greedy_summary.csv")
+        with open(summary_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Case", "Steps", "Optimal", "Failed", "Collisions"])
+
+            for filename in sorted(os.listdir(args.configs_dir)):
+                if filename.endswith(".yaml"):
+                    case_path = os.path.join(args.configs_dir, filename)
+                    case_name = os.path.splitext(filename)[0]
+                    print(f"\n📁 Running case: {case_name}")
+                    log_path = os.path.join(args.log_dir, f"{case_name}_log.csv")
+                    steps, optimal, failed, collisions = run(
+                        config_path=case_path,
+                        log_path=log_path
+                    )
+                    writer.writerow([case_name, steps, optimal, int(failed), collisions])
+        print(f"\n✅ Summary written to: {summary_path}")
