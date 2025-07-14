@@ -5,3 +5,5 @@
 *.csv
 *.txt
 /configs/eval
+*.zip
+.DS_Store
