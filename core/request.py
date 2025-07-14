@@ -9,10 +9,9 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
-def send_image_to_model_ollama(image_path, prompt):
-    
+def send_image_to_model_ollama(image_path, prompt, model='llava'):
     response = ollama.chat(
-        model='llava',
+        model=model,
         messages=[
             {
                 'role': 'user',
@@ -21,7 +20,7 @@ def send_image_to_model_ollama(image_path, prompt):
             }
         ]
     )
-    return (prompt, response['message']['content'].strip().lower())
+    return prompt, response['message']['content'].strip()
 
 def send_image_to_model_openai_responses_api(image_path, prompt, temperature=None):
     load_dotenv(override=True)
