@@ -14,14 +14,22 @@ import random
 
 def parse_ranking_response(text):
     try:
+        # Extract JSON block (anything between ```json and ```)
         match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
-        json_str = match.group(1) if match else text[text.index("{"):]
+        json_str = match.group(1) if match else text
+
+        # Clean common LLM formatting issues
+        json_str = json_str.replace("\n", " ").replace("\r", " ").strip()
+        json_str = re.sub(r"\s+", " ", json_str)  # collapse multiple spaces
+
         parsed = json.loads(json_str)
 
         reasoning = parsed.get("reasoning", "").strip()
         explanation = parsed.get("explanation", "").strip()
         ranking = [g.strip().upper() for g in parsed.get("ranking", []) if isinstance(g, str)]
+
         return ranking, explanation, reasoning
+
     except Exception as e:
         print(f"Failed to parse ranking JSON: {e}")
         with open("fails.txt", "a") as f:
