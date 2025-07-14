@@ -46,7 +46,7 @@ def resolve_conflicts(rankings, active):
                     assigned[loser] = None
     return assigned
 
-def run(config_path, log_path="data/greedy_log.csv", max_steps=50):
+def run(config_path, log_path="data/greedy_log.csv", max_steps=100):
     env = GridWorld(config_path)
     num_agents = len(env.agents)
     active = [True] * num_agents

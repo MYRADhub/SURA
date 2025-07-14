@@ -141,7 +141,7 @@ def resolve_conflicts(agent_rankings, active_agents):
 def run(
     image_path="data/grid.png",
     log_path="data/agent_rank_logs.csv",
-    max_steps=30,
+    max_steps=100,
     config_path=None,
     obstacles={(2, 2), (3, 3), (4, 1)},
     grid_size=6,
