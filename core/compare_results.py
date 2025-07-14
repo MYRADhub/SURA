@@ -2,8 +2,9 @@ import csv
 import argparse
 from collections import defaultdict
 
-def load_results(file_path, is_multi_trial=False):
+def load_results(file_path, is_multi_trial=False, return_raw_trials=False):
     results = defaultdict(list)
+
     with open(file_path, newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -27,9 +28,11 @@ def load_results(file_path, is_multi_trial=False):
             "fail": total_failed,
             "collisions": avg_collisions
         }
+
+    if return_raw_trials:
+        return aggregated, results
     return aggregated
 
-# ✅ NEW: Load optimal results from a summary file
 def load_optimal_results(file_path):
     optimal = {}
     with open(file_path, newline="") as f:
@@ -39,7 +42,21 @@ def load_optimal_results(file_path):
             optimal[case] = int(row["OptimalCost"])
     return optimal
 
-# ✅ MODIFIED: Accept third dict `optimal_data` and compare both agents to it
+def average_trial_difference(trials_dict):
+    """Returns average absolute step difference between trials per case."""
+    diffs = []
+    for case, trials in trials_dict.items():
+        if len(trials) < 2:
+            continue
+        steps = [t[0] for t in trials]
+        if len(steps) == 2:
+            diff = abs(steps[0] - steps[1])
+        else:
+            avg = sum(steps) / len(steps)
+            diff = sum(abs(s - avg) for s in steps) / len(steps)
+        diffs.append(diff)
+    return sum(diffs) / len(diffs) if diffs else 0.0
+
 def compare(agent1_results, agent2_results, optimal_data, label1="Agent 1", label2="Agent 2"):
     shared_cases = sorted(set(agent1_results) & set(agent2_results) & set(optimal_data))
     if not shared_cases:
@@ -87,6 +104,8 @@ def compare(agent1_results, agent2_results, optimal_data, label1="Agent 1", labe
     avg_steps1 = stats["total_steps_agent1"] / stats["total_cases"]
     avg_steps2 = stats["total_steps_agent2"] / stats["total_cases"]
     avg_opt = stats["total_optimal"] / stats["total_cases"]
+    avg_diff1 = average_trial_difference(agent1_trials)
+    avg_diff2 = average_trial_difference(agent2_trials)
 
     print(f"\n📊 Comparison Summary ({label1} vs {label2}):")
     print(f"- Total Cases Compared: {stats['total_cases']}")
@@ -97,6 +116,8 @@ def compare(agent1_results, agent2_results, optimal_data, label1="Agent 1", labe
     print(f"- Avg Gap to Optimal: {label1}: {stats['gap_agent1'] / stats['total_cases']:.2f}, {label2}: {stats['gap_agent2'] / stats['total_cases']:.2f}")
     print(f"- Avg Collisions: {label1}: {stats['total_collisions_agent1'] / stats['total_cases']:.2f}, {label2}: {stats['total_collisions_agent2'] / stats['total_cases']:.2f}")
     print(f"- Failures: {label1}: {stats['failures_agent1']}, {label2}: {stats['failures_agent2']}")
+    print(f"- Avg trial difference for {args.label1}: {avg_diff1:.2f} steps")
+    print(f"- Avg trial difference for {args.label2}: {avg_diff2:.2f} steps")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare two agent result CSVs by case.")
@@ -108,8 +129,8 @@ if __name__ == "__main__":
     parser.add_argument("--multi-trial", action="store_true", help="Average over multiple trials per case")
     args = parser.parse_args()
 
-    agent1_data = load_results(args.agent1, is_multi_trial=args.multi_trial)
-    agent2_data = load_results(args.agent2, is_multi_trial=args.multi_trial)
+    agent1_data, agent1_trials = load_results(args.agent1, is_multi_trial=args.multi_trial, return_raw_trials=args.multi_trial)
+    agent2_data, agent2_trials = load_results(args.agent2, is_multi_trial=args.multi_trial, return_raw_trials=args.multi_trial)
     optimal_data = load_optimal_results(args.optimal)
 
     compare(agent1_data, agent2_data, optimal_data, label1=args.label1, label2=args.label2)
