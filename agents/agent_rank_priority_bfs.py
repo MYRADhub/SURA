@@ -8,7 +8,6 @@ from core.prompt import (
 from core.request import send_image_to_model_openai_logprobs
 from core.plot import plot_grid_unassigned_labeled
 from core.utils import shortest_path_length, select_direction_opt
-from core.request import send_image_to_model_openai_logprobs
 import re
 import argparse
 import random
@@ -28,26 +27,6 @@ def parse_ranking_response(text):
         with open("fails.txt", "a") as f:
             f.write(f"[Ranking Parsing Error] {e}\n{text}\n\n")
         return [], "", ""
-
-def parse_move_response(text):
-    try:
-        # Extract JSON block between triple backticks
-        match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-        else:
-            # Fallback: try to find first '{'
-            json_start = text.index('{')
-            json_str = text[json_start:]
-        parsed = json.loads(json_str)
-        move = parsed.get("move", "").strip().upper()
-        explanation = parsed.get("explanation", "").strip()
-        return move, explanation
-    except Exception as e:
-        print(f"Failed to parse move JSON: {e}")
-        with open("fails.txt", "a") as f:
-            f.write(f"[Move Parsing Error] {e}\n{text}\n\n")
-        return None, ""
 
 def select_target(
     agent_id,
