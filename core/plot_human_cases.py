@@ -161,9 +161,31 @@ def plot_grid_for_humans(env: GridWorld, image_path="data/grid_human.png"):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate human-readable grid and distance table.")
-    parser.add_argument("--config", required=True, help="Path to a single config YAML file")
-    parser.add_argument("--out", default="data/grid_human.png", help="Base path to save image(s)")
+    parser.add_argument("--config", help="Path to a single config YAML file")
+    parser.add_argument("--config-dir", help="Directory containing multiple config YAML files")
+    parser.add_argument("--out-dir", default="human_grids", help="Directory to save output images")
     args = parser.parse_args()
 
-    env = GridWorld(args.config)
-    plot_grid_for_humans(env, image_path=args.out)
+    if (args.config and args.config_dir) or (not args.config and not args.config_dir):
+        raise ValueError("Please provide either --config or --config-dir (but not both).")
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    if args.config:
+        env = GridWorld(args.config)
+        base_name = os.path.splitext(os.path.basename(args.config))[0]
+        out_path = os.path.join(args.out_dir, f"{base_name}.png")
+        plot_grid_for_humans(env, image_path=out_path)
+
+    else:
+        for fname in sorted(os.listdir(args.config_dir)):
+            if fname.endswith(".yaml"):
+                config_path = os.path.join(args.config_dir, fname)
+                base_name = os.path.splitext(fname)[0]
+                out_path = os.path.join(args.out_dir, f"{base_name}.png")
+                print(f"\n📄 Processing {fname}")
+                try:
+                    env = GridWorld(config_path)
+                    plot_grid_for_humans(env, image_path=out_path)
+                except Exception as e:
+                    print(f"❌ Failed to process {fname}: {e}")
