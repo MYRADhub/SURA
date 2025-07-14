@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from core.environment import GridWorld
 from collections import deque
+from PIL import Image
 
 def shortest_path_length(start, goal, env):
     if start == goal:
@@ -131,6 +132,31 @@ def plot_grid_for_humans(env: GridWorld, image_path="data/grid_human.png"):
 
     print(f"Saved grid to {grid_img}")
     print(f"Saved table to {table_img}")
+
+
+    # Merge both images side-by-side
+    combined_img_path = base + "_combined.png"
+
+    img1 = Image.open(grid_img)
+    img2 = Image.open(table_img)
+
+    # Resize table to match height of grid
+    if img1.height != img2.height:
+        ratio = img1.height / img2.height
+        new_width = int(img2.width * ratio)
+        img2 = img2.resize((new_width, img1.height), Image.LANCZOS)
+
+    # Combine horizontally
+    combined = Image.new('RGB', (img1.width + img2.width, img1.height), (255, 255, 255))
+    combined.paste(img1, (0, 0))
+    combined.paste(img2, (img1.width, 0))
+    combined.save(combined_img_path)
+
+    print(f"Combined image saved to {combined_img_path}")
+
+    # Clean up individual images
+    os.remove(grid_img)
+    os.remove(table_img)
 
 if __name__ == "__main__":
     import argparse
