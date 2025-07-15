@@ -20,7 +20,8 @@ TASKS = [
     ("agent_rank", "agents.agent_rank"),
     ("agent_rank_top2", "agents.agent_rank_top2"),
     ("agent_rank_priority_bfs", "agents.agent_rank_priority_bfs"),
-    ("agent_rank_priority_llmdir", "agents.agent_rank_priority_llmdir")
+    ("agent_rank_priority_llmdir", "agents.agent_rank_priority_llmdir"),
+    ("agent_rank_once_bfs", "agents.agent_rank_once_bfs"),
 ]
 
 def evaluate_team(task_key, run_fn, cases):
