@@ -2,9 +2,7 @@ import time
 import json
 import csv
 from core.environment import GridWorld
-from core.prompt import (
-    build_target_ranking_prompt,
-)
+from core.prompt import build_target_ranking_prompt
 from core.request import send_image_to_model_ollama
 from core.plot import plot_grid_unassigned_labeled
 from core.utils import shortest_path_length, select_direction_opt
