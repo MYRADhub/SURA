@@ -88,9 +88,11 @@ if __name__ == "__main__":
     parser.add_argument("--agents", type=str, choices=[t[0] for t in TASKS], nargs="+", default=[t[0] for t in TASKS])
     parser.add_argument("--config-dir", type=str, default="configs/difficult", help="Directory containing configuration YAML files")
     parser.add_argument("--visualize", action="store_true", help="Save visualizations for each scenario")
+    parser.add_argument("--trials", type=int, default=TRIALS_PER_CASE, help="Number of trials per case")
     args = parser.parse_args()
 
     VISUALIZE = args.visualize
+    TRIALS_PER_CASE = args.trials
 
     # Load all YAML cases
     cases = {
