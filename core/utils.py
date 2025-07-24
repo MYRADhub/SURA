@@ -21,8 +21,6 @@ def shortest_path_length(start, goal, env):
                 queue.append((next_pos, dist + 1))
     return float('inf')  # No path found
 
-from collections import deque
-
 def is_reachable(grid_size, start, goal, obstacles):
     if start == goal:
         return True
