@@ -7,3 +7,4 @@
 /configs/eval
 *.zip
 .DS_Store
+*.xlsx
