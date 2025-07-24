@@ -27,6 +27,8 @@ def compute_random_assignment_cost(config_path):
     return team_cost
 
 if __name__ == "__main__":
+    random.seed(42)
+
     parser = argparse.ArgumentParser(description="Compute team cost from random agent-goal assignment.")
     parser.add_argument("--config", type=str, help="Path to a single YAML config file")
     parser.add_argument("--configs-dir", type=str, help="Path to a directory of YAML config files")
