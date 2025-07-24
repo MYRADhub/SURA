@@ -158,73 +158,71 @@ def run(
     print(f"Goal positions: {env.goals}")
     print(f"Obstacles: {obstacles}")
 
-    plot_grid_unassigned_labeled(env, image_path=image_path)
-
-    # ----------- Phase 1: Ranking ----------
-    for i in range(num_agents):
-        if not active[i] or agent_positions[i] is None:
-            continue
-
-        agent_id = agent_ids[i]
-        agent_pos = agent_positions[i]
-        visits[i][agent_pos] = visits[i].get(agent_pos, 0) + 1
-
-        other_infos = [
-            (agent_ids[j], agent_positions[j])
-            for j in range(num_agents)
-            if j != i and agent_positions[j] is not None
-        ]
-
-        distances = {
-            agent_ids[j]: [
-                shortest_path_length(agent_positions[j], goal, env) if agent_positions[j] and goal else float("inf")
-                for goal in env.goals
-            ]
-            for j in range(num_agents)
-        }
-
-        ranking, _, _ = select_target(
-            agent_id=agent_id,
-            agent_pos=agent_pos,
-            goal_positions=env.goals,
-            other_agents=other_infos,
-            grid_size=grid_size,
-            obstacles=obstacles,
-            memory=memories[i],
-            visits=visits[i],
-            agent_targets=target_goals,
-            target_memory=target_memories[i],
-            image_path=image_path,
-            step=step,
-            distances=distances
-        )
-        agent_rankings[i] = ranking
-        
-    # ----------- Phase 2: Conflict Resolution ----------
-    proposed_goals = [rank[0] if rank else None for rank in agent_rankings]
-
-    goal_to_agents = {}
-    for idx, tgt in enumerate(proposed_goals):
-        if active[idx] and tgt:
-            goal_to_agents.setdefault(tgt, []).append(idx)
-
-    conflict_pairs = [
-        (a1, a2, goal)
-        for goal, agents in goal_to_agents.items()
-        if len(agents) == 2
-        for a1, a2 in [tuple(sorted(agents))]
-    ]
-
-    print("Conflict pairs detected:", conflict_pairs)
-
-    # Resolve conflicts deterministically
-    proposed_goals = resolve_conflicts(agent_rankings, active)
-
-    print("Proposed goals after conflict resolution:", proposed_goals)
     while any(active) and step < max_steps:
         print(f"\n--- Step {step} ---")
         plot_grid_unassigned_labeled(env, image_path=image_path)
         proposals = agent_positions[:]
+        proposed_goals = [None for _ in range(num_agents)]
+
+        # ----------- Phase 1: Ranking ----------
+        for i in range(num_agents):
+            if not active[i] or agent_positions[i] is None:
+                continue
+
+            agent_id = agent_ids[i]
+            agent_pos = agent_positions[i]
+            visits[i][agent_pos] = visits[i].get(agent_pos, 0) + 1
+
+            other_infos = [
+                (agent_ids[j], agent_positions[j])
+                for j in range(num_agents)
+                if j != i and agent_positions[j] is not None
+            ]
+
+            distances = {
+                agent_ids[j]: [
+                    shortest_path_length(agent_positions[j], goal, env) if agent_positions[j] and goal else float("inf")
+                    for goal in env.goals
+                ]
+                for j in range(num_agents)
+            }
+
+            ranking, _, _ = select_target(
+                agent_id=agent_id,
+                agent_pos=agent_pos,
+                goal_positions=env.goals,
+                other_agents=other_infos,
+                grid_size=grid_size,
+                obstacles=obstacles,
+                memory=memories[i],
+                visits=visits[i],
+                agent_targets=target_goals,
+                target_memory=target_memories[i],
+                image_path=image_path,
+                step=step,
+                distances=distances
+            )
+            agent_rankings[i] = ranking
+
+        # ----------- Phase 2: Conflict Resolution ----------
+        proposed_goals = [rank[0] if rank else None for rank in agent_rankings]
+
+        goal_to_agents = {}
+        for idx, tgt in enumerate(proposed_goals):
+            if active[idx] and tgt:
+                goal_to_agents.setdefault(tgt, []).append(idx)
+
+        conflict_pairs = [
+            (a1, a2, goal)
+            for goal, agents in goal_to_agents.items()
+            if len(agents) == 2
+            for a1, a2 in [tuple(sorted(agents))]
+        ]
+
+        print("Conflict pairs detected:", conflict_pairs)
+
+        # Resolve conflicts deterministically
+        proposed_goals = resolve_conflicts(agent_rankings, active)
 
         # ----------- Phase 3: Direction Selection & Movement ----------
         for i in range(num_agents):

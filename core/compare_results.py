@@ -29,9 +29,7 @@ def load_results(file_path, is_multi_trial=False, return_raw_trials=False):
             "collisions": avg_collisions
         }
 
-    if return_raw_trials:
-        return aggregated, results
-    return aggregated
+    return aggregated, results
 
 def load_optimal_results(file_path):
     optimal = {}
