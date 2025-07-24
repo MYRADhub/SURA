@@ -1,5 +1,7 @@
 import random
 import yaml
+from collections import deque
+from core.utils import shortest_path_length
 
 class GridWorld:
     def __init__(self, size_or_config, obstacles=None):
@@ -124,3 +126,35 @@ class GridWorld:
             self.goals.pop(index)
         else:
             raise IndexError("Goal index out of range.")
+
+    def assignment_cost(self, assignment: dict[int, str]) -> int:
+        """
+        Compute the maximum BFS path length (cost) of a given agent-to-goal assignment.
+
+        Args:
+            assignment (dict[int, str]): Mapping from agent ID (1-based) to goal letter ('A', 'B', ...)
+
+        Returns:
+            int: The maximum path length among all agent-goal pairs (team cost).
+        """
+        costs = []
+
+        for agent_id, goal_letter in assignment.items():
+            agent_idx = agent_id - 1
+            goal_idx = ord(goal_letter.upper()) - ord('A')
+
+            if agent_idx >= len(self.agents):
+                raise IndexError(f"Agent {agent_id} is out of bounds.")
+            if goal_idx >= len(self.goals):
+                raise IndexError(f"Goal '{goal_letter}' is out of bounds.")
+
+            agent_pos = self.agents[agent_idx]
+            goal_pos = self.goals[goal_idx]
+
+            if agent_pos is None or goal_pos is None:
+                costs.append(float('inf'))
+            else:
+                dist = shortest_path_length(agent_pos, goal_pos, self)
+                costs.append(dist)
+
+        return max(costs) if costs else float('inf')
