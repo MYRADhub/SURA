@@ -37,7 +37,7 @@ def load_optimal_results(file_path):
         reader = csv.DictReader(f)
         for row in reader:
             case = row["Case"]
-            optimal[case] = int(row["OptimalCost"])
+            optimal[case] = int(row["Cost"])
     return optimal
 
 def average_trial_difference(trials_dict):
