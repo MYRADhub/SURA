@@ -4,11 +4,8 @@ from openpyxl import load_workbook
 from core.environment import GridWorld
 
 def extract_assignments_from_sheet(sheet):
-    """
-    Returns: dict[int, str] — mapping agent number to goal letter
-    """
     assignment = {}
-    for row in range(25, 100):  # scan rows 25 to 99
+    for row in range(25, 100):  # Scan from row 25 down
         agent_cell = sheet[f"A{row}"]
         goal_cell = sheet[f"B{row}"]
         if agent_cell.value and isinstance(agent_cell.value, str) and agent_cell.value.strip().startswith("Agent"):
@@ -16,65 +13,61 @@ def extract_assignments_from_sheet(sheet):
             goal_letter = str(goal_cell.value).strip().upper()
             assignment[agent_num] = goal_letter
         elif not agent_cell.value:
-            break  # stop if empty row
+            break
     return assignment
 
-def process_workbook(filepath, configs_dir):
-    """
-    Extract from all sheets in a workbook
-    Returns list of tuples: (case_name, assignment_dict, cost)
-    """
-    wb = load_workbook(filepath, data_only=True)
-    results = []
-
-    for sheetname in wb.sheetnames:
-        sheet = wb[sheetname]
-        case_name = sheetname.strip()
-
-        config_path = os.path.join(configs_dir, f"{case_name}.yaml")
-        if not os.path.exists(config_path):
-            print(f"❌ Config missing for {case_name}")
-            continue
-
-        try:
-            env = GridWorld(config_path)
-            assignment = extract_assignments_from_sheet(sheet)
-            cost = env.assignment_cost(assignment)
-            results.append((case_name, assignment, cost))
-        except Exception as e:
-            print(f"❌ Error in {case_name}: {e}")
-            continue
-
-    return results
-
-def main():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--xlsx-dir", required=True, help="Directory containing .xlsx human files")
-    parser.add_argument("--configs-dir", required=True, help="Directory of YAML config files")
-    parser.add_argument("--output", default="human_summary.csv", help="Path to save summary CSV")
-    args = parser.parse_args()
-
+def process_all_files(xlsx_dir, configs_dir, output):
+    # Get all xlsx files, sort for deterministic ordering
+    xlsx_files = sorted([f for f in os.listdir(xlsx_dir) if f.endswith(".xlsx")])
+    total_cases = 0
     all_rows = []
-    for filename in sorted(os.listdir(args.xlsx_dir)):
-        if filename.endswith(".xlsx"):
-            full_path = os.path.join(args.xlsx_dir, filename)
-            print(f"📄 Processing: {filename}")
-            results = process_workbook(full_path, args.configs_dir)
-            for case, assignment, cost in results:
-                row = {
-                    "Case": case,
+    case_counter = 1
+    # Sort the files in numerical order ("Person_10_louis" comes after "Person_2_jad")
+    if not xlsx_files:
+        print("No XLSX files found in the specified directory.")
+        return
+    xlsx_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))  # Extract number from filename
+    print(f"Listing {len(xlsx_files)} XLSX files to process...")
+    print(xlsx_files)
+
+    for filename in xlsx_files:
+        wb = load_workbook(os.path.join(xlsx_dir, filename), data_only=True)
+        sheets = wb.worksheets  # list in order
+        print(len(sheets), filename)
+        for sheet in sheets:
+            # Map sheet index (within file) to case_X.yaml
+            case_name = f"case_{case_counter}"
+            config_path = os.path.join(configs_dir, f"{case_name}.yaml")
+            if not os.path.exists(config_path):
+                print(f"❌ Config missing for {case_name}")
+                case_counter += 1
+                continue
+            try:
+                env = GridWorld(config_path)
+                assignment = extract_assignments_from_sheet(sheet)
+                cost = env.assignment_cost(assignment)
+                all_rows.append({
+                    "Case": case_name,
                     "Cost": cost,
                     "Assignment": str(assignment)
-                }
-                all_rows.append(row)
+                })
+            except Exception as e:
+                print(f"❌ Error in {case_name}: {e}")
+            case_counter += 1
+            total_cases += 1
 
     if all_rows:
         df = pd.DataFrame(all_rows)
-        df.to_csv(args.output, index=False)
-        print(f"\n✅ Saved summary to {args.output}")
+        df.to_csv(output, index=False)
+        print(f"\n✅ Saved summary for {total_cases} sheets to {output}")
     else:
         print("⚠️ No data extracted.")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--xlsx-dir", required=True, help="Directory with all XLSX files")
+    parser.add_argument("--configs-dir", required=True, help="Directory with config YAML files")
+    parser.add_argument("--output", default="human_summary.csv", help="CSV file for output")
+    args = parser.parse_args()
+    process_all_files(args.xlsx_dir, args.configs_dir, args.output)
