@@ -329,6 +329,7 @@ Rank goals for yourself in order of which assignment leads to the lowest maximum
 ### Question
 
 Rank the remaining goals for Agent {agent_id} from most to least preferred — based on team-optimal coordination. Return your top-to-bottom preferences.
+YOU HAVE TO RANK ALL GOALS, SO IN YOUR RANKING ALL GOALS MUST BE PRESENT, EVEN IF YOU THINK SOME ARE NOT RELEVANT.
 
 Return **only** JSON:
 ```json
@@ -492,71 +493,72 @@ def run(
     print(f"Goal positions: {env.goals}")
     print(f"Obstacles: {obstacles}")
 
+    plot_grid_unassigned_labeled(env, image_path=image_path)
+
+    # ----------- Phase 1: Ranking (ONLY ONCE) ----------
+    for i in range(num_agents):
+        if not active[i] or agent_positions[i] is None:
+            continue
+
+        agent_id = agent_ids[i]
+        agent_pos = agent_positions[i]
+        visits[i][agent_pos] = visits[i].get(agent_pos, 0) + 1
+
+        other_infos = [
+            (agent_ids[j], agent_positions[j])
+            for j in range(num_agents)
+            if j != i and agent_positions[j] is not None
+        ]
+
+        distances = {
+            agent_ids[j]: [
+                shortest_path_length(agent_positions[j], goal, env) if agent_positions[j] and goal else float("inf")
+                for goal in env.goals
+            ]
+            for j in range(num_agents)
+        }
+
+        ranking, _, _ = select_target(
+            agent_id=agent_id,
+            agent_pos=agent_pos,
+            goal_positions=env.goals,
+            other_agents=other_infos,
+            grid_size=grid_size,
+            obstacles=obstacles,
+            memory=memories[i],
+            visits=visits[i],
+            agent_targets=target_goals,
+            target_memory=target_memories[i],
+            image_path=image_path,
+            step=step,
+            distances=distances
+        )
+        agent_rankings[i] = ranking
+
+    # ----------- Phase 2: Conflict Resolution (ONLY ONCE) ----------
+    proposed_goals = [rank[0] if rank else None for rank in agent_rankings]
+
+    goal_to_agents = {}
+    for idx, tgt in enumerate(proposed_goals):
+        if active[idx] and tgt:
+            goal_to_agents.setdefault(tgt, []).append(idx)
+
+    conflict_pairs = [
+        (a1, a2, goal)
+        for goal, agents in goal_to_agents.items()
+        if len(agents) == 2
+        for a1, a2 in [tuple(sorted(agents))]
+    ]
+    print("Conflict pairs detected:", conflict_pairs)
+    proposed_goals = resolve_conflicts(agent_rankings, active)
+    print("Proposed goals after conflict resolution:", proposed_goals)
+
+
+    # Main loop
     while any(active) and step < max_steps:
         print(f"\n--- Step {step} ---")
         plot_grid_unassigned_labeled(env, image_path=image_path)
         proposals = agent_positions[:]
-        proposed_goals = [None for _ in range(num_agents)]
-
-        # ----------- Phase 1: Ranking ----------
-        for i in range(num_agents):
-            if not active[i] or agent_positions[i] is None:
-                continue
-
-            agent_id = agent_ids[i]
-            agent_pos = agent_positions[i]
-            visits[i][agent_pos] = visits[i].get(agent_pos, 0) + 1
-
-            other_infos = [
-                (agent_ids[j], agent_positions[j])
-                for j in range(num_agents)
-                if j != i and agent_positions[j] is not None
-            ]
-
-            distances = {
-                agent_ids[j]: [
-                    shortest_path_length(agent_positions[j], goal, env) if agent_positions[j] and goal else float("inf")
-                    for goal in env.goals
-                ]
-                for j in range(num_agents)
-            }
-
-            ranking, _, _ = select_target(
-                agent_id=agent_id,
-                agent_pos=agent_pos,
-                goal_positions=env.goals,
-                other_agents=other_infos,
-                grid_size=grid_size,
-                obstacles=obstacles,
-                memory=memories[i],
-                visits=visits[i],
-                agent_targets=target_goals,
-                target_memory=target_memories[i],
-                image_path=image_path,
-                step=step,
-                distances=distances
-            )
-            agent_rankings[i] = ranking
-
-        # ----------- Phase 2: Conflict Resolution ----------
-        proposed_goals = [rank[0] if rank else None for rank in agent_rankings]
-
-        goal_to_agents = {}
-        for idx, tgt in enumerate(proposed_goals):
-            if active[idx] and tgt:
-                goal_to_agents.setdefault(tgt, []).append(idx)
-
-        conflict_pairs = [
-            (a1, a2, goal)
-            for goal, agents in goal_to_agents.items()
-            if len(agents) == 2
-            for a1, a2 in [tuple(sorted(agents))]
-        ]
-
-        print("Conflict pairs detected:", conflict_pairs)
-
-        # Resolve conflicts deterministically
-        proposed_goals = resolve_conflicts(agent_rankings, active)
 
         # ----------- Phase 3: Direction Selection & Movement ----------
         for i in range(num_agents):
@@ -606,6 +608,25 @@ def run(
                 if new_positions[i] == new_positions[j] and agent_positions[i] is not None and agent_positions[j] is not None:
                     collisions += 1
                     new_positions[j] = agent_positions[j]
+
+        # ----------- Face-to-face Swap Conflict Prevention -----------
+        # After normal collision resolution, prevent head-on swaps
+        move_from = {i: agent_positions[i] for i in range(num_agents)}
+        move_to = {i: new_positions[i] for i in range(num_agents)}
+        swaps = []
+        for i in range(num_agents):
+            for j in range(i + 1, num_agents):
+                if (
+                    move_to[i] == move_from[j] and
+                    move_to[j] == move_from[i] and
+                    move_from[i] != move_to[i]  # both actually tried to move
+                ):
+                    swaps.append((i, j))
+
+        # Force both agents to stay put if they try to swap places
+        for i, j in swaps:
+            new_positions[i] = agent_positions[i]
+            new_positions[j] = agent_positions[j]
 
         agent_positions = new_positions
         env.agents = agent_positions[:]
