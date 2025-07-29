@@ -27,9 +27,11 @@ def main(args):
     # Bar width and figure setup
     total_width = 0.8
     n_bars = len(args.csvs)
-    bar_width = total_width / n_bars
+    gap = 0.01  # gap between bars (in axis units)
+    bar_width = (total_width - gap * (n_bars - 1)) / n_bars
 
     fig, ax = plt.subplots(figsize=(8, 5))
+    colors = ['#00c0ff', '#b2b2b2', '#fdce00', '#ff5700', '#e8519a', '#98c126', '#FFB356']
 
     # Plot each CSV as a group of bars
     for i, (df, label) in enumerate(zip(all_dfs, args.labels)):
@@ -40,9 +42,10 @@ def main(args):
             row = df[df['Agents'] == a]
             means.append(row['Mean'].values[0] if not row.empty else np.nan)
             stds.append(row['Std'].values[0] if not row.empty else 0)
-        # Bar positions, shifted for grouping
-        positions = x - total_width/2 + i*bar_width + bar_width/2
-        ax.bar(positions, means, width=bar_width, yerr=stds, capsize=6, label=label)
+        # Bar positions, shifted for grouping, with gap between bars
+        positions = x - total_width/2 + i*(bar_width + gap) + bar_width/2
+        # Plot bars without error bars for simplicity
+        ax.bar(positions, means, width=bar_width, label=label, color=colors[i % len(colors)])
 
     # Labeling and ticks
     ax.set_xlabel('Number of agents')
@@ -50,7 +53,7 @@ def main(args):
     ax.set_xticks(x)
     ax.set_xticklabels(all_agent_counts)
     ax.set_title('Performance by Number of Agents')
-    ax.legend()
+    ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1))
     fig.tight_layout()
 
     if args.out:
