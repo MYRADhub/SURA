@@ -12,10 +12,15 @@ def load_results(csv_path):
 
 def main(args):
     assert len(args.csvs) == len(args.labels), "Must provide one label per CSV."
+    assert args.optimal, "Must provide the path to the optimal baseline results with --optimal"
+
+    # Load optimal CSV and build a mapping: agent_count -> mean optimal
+    optimal_df = load_results(args.optimal)
+    optimal_map = {row['Agents']: row['Mean'] for idx, row in optimal_df.iterrows()}
 
     # Load all dataframes and collect unique agent counts
     all_dfs = []
-    all_agent_counts = set()
+    all_agent_counts = set(optimal_map.keys())
     for csv in args.csvs:
         df = load_results(csv)
         all_dfs.append(df)
@@ -33,26 +38,29 @@ def main(args):
     fig, ax = plt.subplots(figsize=(8, 5))
     colors = ['#00c0ff', '#b2b2b2', '#fdce00', '#ff5700', '#e8519a', '#98c126', '#FFB356']
 
-    # Plot each CSV as a group of bars
+    # Plot each CSV as a group of bars (now as difference from optimal)
     for i, (df, label) in enumerate(zip(all_dfs, args.labels)):
         # Align each method's means and stds with the full list of agent counts
         means = []
         stds = []
         for a in all_agent_counts:
+            opt = optimal_map.get(a, np.nan)
             row = df[df['Agents'] == a]
-            means.append(row['Mean'].values[0] if not row.empty else np.nan)
-            stds.append(row['Std'].values[0] if not row.empty else 0)
+            method_mean = row['Mean'].values[0] if not row.empty else np.nan
+            method_std = row['Std'].values[0] if not row.empty else 0
+            # Subtract optimal from method's mean
+            means.append(method_mean - opt if not np.isnan(method_mean) and not np.isnan(opt) else np.nan)
+            stds.append(method_std)
         # Bar positions, shifted for grouping, with gap between bars
         positions = x - total_width/2 + i*(bar_width + gap) + bar_width/2
-        # Plot bars without error bars for simplicity
         ax.bar(positions, means, width=bar_width, label=label, color=colors[i % len(colors)])
 
     # Labeling and ticks
     ax.set_xlabel('Number of agents')
-    ax.set_ylabel('Mean performance')
+    ax.set_ylabel('Mean Steps Above Optimal')
     ax.set_xticks(x)
     ax.set_xticklabels(all_agent_counts)
-    ax.set_title('Performance by Number of Agents')
+    ax.set_title('Performance Gap Above Optimal by Number of Agents')
     ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1))
     fig.tight_layout()
 
@@ -63,9 +71,10 @@ def main(args):
         plt.show()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Compare baselines with grouped bar plot.')
+    parser = argparse.ArgumentParser(description='Compare baselines against optimal with grouped bar plot.')
     parser.add_argument('--csvs', nargs='+', required=True, help='Paths to CSV files (one per method)')
     parser.add_argument('--labels', nargs='+', required=True, help='Custom labels (one per CSV)')
+    parser.add_argument('--optimal', type=str, required=True, help='Path to the optimal baseline results CSV')
     parser.add_argument('--out', type=str, default=None, help='Output file for figure (e.g., plot.pdf)')
     args = parser.parse_args()
     main(args)
