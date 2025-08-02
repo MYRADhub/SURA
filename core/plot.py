@@ -244,7 +244,7 @@ def plot_grid_unassigned_labeled(env: GridWorld, image_path="data/grid_labeled.p
             else:           # Empty cell → show padded number
                 padded_num = str(cell_counter).zfill(num_digits)
                 ax.text(c + 0.5, r + 0.5, padded_num,
-                        color="gray", fontsize=8, ha='center', va='center', alpha=0.6)
+                        color="gray", fontsize=6, ha='center', va='center', alpha=0.6)
             cell_counter += 1
 
     # Border directions
