@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from core.environment import GridWorld
+import argparse
+import json
+import os
 
 def plot_grid(env: GridWorld, image_path="data/grid.png"):
     grid = np.ones((env.size, env.size, 3))
@@ -271,9 +274,16 @@ def plot_grid_unassigned_labeled(env: GridWorld, image_path="data/grid_labeled.p
 
 
 if __name__ == "__main__":
-    env = GridWorld(size=8, obstacles={(2, 2), (3, 3), (5, 5)})
-    env.initialize_agents_goals(num_agents=4)
-    plot_grid(env)
-    plot_grid_unassigned(env, image_path="data/grid_unassigned.png")
-    plot_grid_unassigned_labeled(env, image_path="data/grid_unassigned_labeled.png")
-    print("Grid with arbitrary agents and obstacles saved.")
+    parser = argparse.ArgumentParser(description="Plot grid from config file.")
+    parser.add_argument("--config", type=str, required=True, help="Path to config JSON file")
+    parser.add_argument("--output", type=str, required=True, help="Output image path")
+    args = parser.parse_args()
+
+    config = args.config
+
+    # Create environment
+    env = GridWorld(size_or_config=config)
+
+    # Plot
+    plot_grid_unassigned_labeled(env, image_path=args.output)
+    print(f"Grid saved to {args.output}")
