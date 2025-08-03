@@ -4,7 +4,7 @@ import numpy as np
 from core.environment import GridWorld
 from core.find_optim_sol import compute_distance_matrix, find_best_assignment
 
-AGENT_COLORS = ['#007bff', '#e94f37', '#44af69', '#f5cb5c', '#9966cc', '#b83b5e', '#2f4858']
+AGENT_COLORS = ['#007bff', '#44af69', '#f5cb5c', '#9966cc', '#b83b5e', '#2f4858']
 
 def find_path_bfs(start, goal, env):
     from collections import deque
@@ -50,10 +50,10 @@ def plot_grid_with_assignment(env, assignment, output_path):
 
     # Add border directions
     margin = 0.5
-    ax.axvline(env.size + margin, color='blue', linewidth=16, zorder=0)    # Right
-    ax.axvline(-margin, color='yellow', linewidth=16, zorder=0)            # Left
-    ax.axhline(env.size + margin, color='green', linewidth=16, zorder=0)   # Top
-    ax.axhline(-margin, color='orange', linewidth=16, zorder=0)            # Bottom
+    ax.axvline(env.size + margin, color='blue', linewidth=16, zorder=10)    # Right
+    ax.axvline(-margin, color='yellow', linewidth=16, zorder=10)            # Left
+    ax.axhline(env.size + margin, color='green', linewidth=16, zorder=10)   # Top
+    ax.axhline(-margin, color='orange', linewidth=16, zorder=10)            # Bottom
 
     # Diagonal blockers
     for r in range(env.size - 1):
@@ -102,15 +102,17 @@ def plot_grid_with_assignment(env, assignment, output_path):
         # Draw the path as a dashed line (excluding last point)
         if len(path) >= 2:
             xs, ys = zip(*path)
+            # Exclude the last point (goal) from the path for the dashed line
             ax.plot(
-                [c + 0.5 for c in ys], [r + 0.5 for r in xs],
-                color=color, linewidth=2, linestyle='--', alpha=0.85, zorder=2,
+                [ys[i] + 0.5 for i in range(len(path) - 1)],
+                [xs[i] + 0.5 for i in range(len(path) - 1)],
+                color=color, linewidth=2, linestyle='--', alpha=0.85, zorder=0,
             )
             # Draw a thick arrow from the penultimate to the goal
             if len(path) >= 2:
                 ax.arrow(
                     ys[-2] + 0.5, xs[-2] + 0.5,
-                    ys[-1] - ys[-2], xs[-1] - xs[-2],
+                    (ys[-1] - ys[-2]) / 2, (xs[-1] - xs[-2]) / 2,
                     head_width=0.28, head_length=0.28,
                     fc=color, ec=color, zorder=3, length_includes_head=True,
                     alpha=0.9, linewidth=4
