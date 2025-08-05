@@ -1,7 +1,3 @@
-Absolutely! Here’s a **clean, professional README** for your project, based on your summary and my understanding of your work. This is ready for GitHub or any academic code release:
-
----
-
 # Decentralized Multi-Agent Path Planning and Goal Assignment with Large Language Models
 
 ## Overview
